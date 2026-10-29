@@ -1,0 +1,66 @@
+export type IssueStatus = string;
+
+export type Priority = string;
+
+export interface Subtask {
+  id: string;
+  key: string;
+  title: string;
+  status: IssueStatus;
+  done: boolean;
+  assignee?: {
+    name: string;
+    avatarInitials: string;
+    avatarColor: string;
+  };
+  estimate?: string;
+  timeSpent?: string;
+}
+
+export interface JiraIssue {
+  id: string;
+  key: string;
+  type: 'task' | 'epic' | 'bug' | 'story';
+  title: string;
+  status: IssueStatus;
+  priority: Priority;
+  version?: string;
+  component?: string;
+  sprintInfo?: string;
+  progress?: {
+    doneCount: number;
+    totalCount: number;
+    percent: number;
+  };
+  assignee: {
+    name: string;
+    initials: string;
+    color: string;
+    isCurrentUser?: boolean;
+  };
+  reporter: {
+    name: string;
+    initials: string;
+  };
+  estimate: string;
+  timeSpent?: string;
+  subtasks?: Subtask[];
+  description?: string;
+  createdDate?: string;
+  updatedDate?: string;
+  labels?: string[];
+  parentKey?: string;
+  filterTags: Array<'assigned' | 'reported' | 'recent' | 'sprint'>;
+}
+
+export type FilterKey = 'assigned' | 'reported' | 'recent' | 'sprint';
+
+export type ActiveTab = 'issues' | 'tracker' | 'details';
+
+export interface ActiveTimer {
+  issueKey: string;
+  issueTitle: string;
+  seconds: number;
+  isRunning: boolean;
+  startedAt?: Date;
+}

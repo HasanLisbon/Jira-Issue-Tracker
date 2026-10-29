@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" fill="none">
+  <!-- Left / Upper Swoosh -->
+  <path d="M10.8 0.5C10.8 0.5 4.2 3.2 2.6 7.1C1.2 10.4 2.8 12.2 4.6 12.4C4.1 11.2 3.9 10.1 4.2 8.9C4.5 7.6 5.4 6.5 6.6 5.9C7.8 5.3 9.4 4.5 10.8 0.5Z" fill="#388BFF" />
+
+  <!-- Right / Lower Swoosh -->
+  <path d="M5.2 15.5C5.2 15.5 11.8 12.8 13.4 8.9C14.8 5.6 13.2 3.8 11.4 3.6C11.9 4.8 12.1 5.9 11.8 7.1C11.5 8.4 10.6 9.5 9.4 10.1C8.2 10.7 6.6 11.5 5.2 15.5Z" fill="#579DFF" />
+
+  <!-- Issue Tracking Reticle (High-Contrast Bold) -->
+  <circle cx="8" cy="8" r="3.2" stroke="#57D9A3" stroke-width="1.6" />
+  <circle cx="8" cy="8" r="1.2" fill="#57D9A3" />
+</svg>

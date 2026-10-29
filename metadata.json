@@ -1,0 +1,6 @@
+{
+  "name": "IntelliJ Jira Issues Tool Window",
+  "description": "JetBrains New UI tool window plugin for Jira issue tracking and time management with Darcula dark theme.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
