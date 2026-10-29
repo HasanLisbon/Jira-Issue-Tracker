@@ -16,7 +16,7 @@
         <applicationConfigurable id="dev.jiraissuetracker.settings" parentId="tools"
                                  instance="dev.jiraissuetracker.intellij.JiraSettingsConfigurable"
                                  bundle="src" key="settings.title"/>
-        <toolWindow id="Jira Issue Tracker"
+        <toolWindow id="Jira Issues"
                     anchor="right"
                     factoryClass="dev.jiraissuetracker.intellij.JiraIssuesToolWindowFactory"
                     icon="/icons/appIcon.svg"
