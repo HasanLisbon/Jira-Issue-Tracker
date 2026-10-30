@@ -29,10 +29,7 @@ dependencies {
         } else {
             intellijIdea(providers.gradleProperty("platformVersion"))
         }
-        bundledPlugin("com.intellij.modules.jcef")
         bundledPlugin("Git4Idea")
-        bundledModule("intellij.platform.vcs.dvcs")
-        bundledModule("intellij.platform.vcs.dvcs.impl")
     }
     testImplementation("junit:junit:4.13.2")
 }
@@ -88,7 +85,7 @@ tasks.processResources {
 intellijPlatform {
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = "262"
+            sinceBuild = "242"
         }
     }
 }

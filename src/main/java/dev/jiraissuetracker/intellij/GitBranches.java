@@ -42,8 +42,8 @@ final class GitBranches {
             }
 
             public List<String> branches(String root) {
-                return run(repository(root), GitCommand.FOR_EACH_REF,
-                        "--format=%(refname)", "refs/heads/", "refs/remotes/").getOutput();
+                return run(repository(root), GitCommand.BRANCH,
+                        "-a", "--format=%(refname)").getOutput();
             }
 
             public void create(String root, String name, String base) {

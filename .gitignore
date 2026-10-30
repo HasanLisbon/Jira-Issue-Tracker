@@ -10,4 +10,6 @@ coverage/
 .intellijPlatform/
 bin/
 out/
+.vscode/
+
 
