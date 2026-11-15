@@ -6,6 +6,8 @@ import { messages } from './messages.ts';
 
 interface MeetingsTabProps {
   issues: JiraIssue[];
+  initialMeetings?: TeamsMeeting[];
+  onMeetingsChange?: (meetings: TeamsMeeting[]) => void;
   onStartTracking: (issue: { key: string; title: string }, event?: React.MouseEvent) => void;
   onLogWork: (key: string, duration: string, comment: string, started: string) => Promise<void>;
   onOpenIssue: (key: string) => void;
@@ -13,7 +15,7 @@ interface MeetingsTabProps {
 }
 
 export const MeetingsTab: React.FC<MeetingsTabProps> = (props) => {
-  const [meetings, setMeetings] = useState<TeamsMeeting[]>([]);
+  const [meetings, setMeetings] = useState<TeamsMeeting[]>(props.initialMeetings || []);
   const [mappings, setMappings] = useState<MeetingTicketMapping[]>([]);
   const [configured, setConfigured] = useState(false);
   const [mode, setMode] = useState<'ics' | 'graph'>('ics');
@@ -47,6 +49,7 @@ export const MeetingsTab: React.FC<MeetingsTabProps> = (props) => {
       setHasGraphToken(response.hasGraphToken);
       setMappings(response.mappings || []);
       setMeetings(response.meetings || []);
+      props.onMeetingsChange?.(response.meetings || []);
       if (!response.configured) {
         setShowConfig(true);
       }

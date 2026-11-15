@@ -10,9 +10,9 @@ import { DetailsTab } from './DetailsTab.tsx';
 import { TrackerTab } from './TrackerTab.tsx';
 import { MeetingsTab } from './MeetingsTab.tsx';
 import { SettingsModal } from './SettingsModal.tsx';
-import { jiraRequest, mapIssue } from './jira.ts';
+import { jiraRequest, mapIssue, evaluateMeetingTimerCollision, findCollidingMeetings } from './jira.ts';
 import type { JiraConnection, JiraUser, RawIssue } from './jira.ts';
-import type { ActiveTab, ActiveTimer, JiraIssue, Subtask, FilterKey } from './types.ts';
+import type { ActiveTab, ActiveTimer, JiraIssue, Subtask, FilterKey, TeamsMeeting, TeamsMeetingsResponse, MeetingTimerPause } from './types.ts';
 import { messages } from './messages.ts';
 import { prepareTracking, branchNames, belongsToRepository, lookupBranches } from './branches.ts';
 import type { BranchPlan, DevBranch, TaskBranches } from './branches.ts';
@@ -34,6 +34,9 @@ export default function App() {
   const [writing, setWriting] = useState(false);
   const [revision, setRevision] = useState(0);
   const [activeTimer, setActiveTimer] = useState<ActiveTimer>({ issueKey: '', issueTitle: '', seconds: 0, isRunning: false });
+  const [meetings, setMeetings] = useState<TeamsMeeting[]>([]);
+  const [pausedByMeeting, setPausedByMeeting] = useState<MeetingTimerPause | null>(null);
+  const dismissedMeetings = useRef<Set<string>>(new Set());
   const generation = useRef(0);
   const writeLock = useRef(false);
   const branchLock = useRef(false);
@@ -72,7 +75,19 @@ export default function App() {
     }
   }
 
-  useEffect(() => { void loadConnections(); }, []);
+  async function loadMeetingsBackground() {
+    try {
+      const response = await jiraRequest<TeamsMeetingsResponse>('teamsMeetings', { sync: true });
+      setMeetings(response.meetings || []);
+    } catch {
+      // Teams sync is optional and should not block Jira issue loading
+    }
+  }
+
+  useEffect(() => {
+    void loadConnections();
+    void loadMeetingsBackground();
+  }, []);
 
   async function loadIssues(id = connectionId, jql = query, scope = filter) {
     if (!id) return;
@@ -96,7 +111,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (connectionId) void loadIssues().catch(() => {});
+    if (connectionId) void loadIssues().catch(() => { });
     return () => { generation.current++; };
   }, [connectionId]);
 
@@ -110,7 +125,7 @@ export default function App() {
     for (const key of new Set(issues.map((issue) => issue.parentKey || issue.key))) {
       void jiraRequest<DevBranch[]>('devBranches', { repositoryId: connectionId, key }).then((linked) => {
         if (!cancelled) setLinkedBranches((previous) => ({ ...previous, [key]: linked }));
-      }).catch(() => {});
+      }).catch(() => { });
       void lookupBranches(() => jiraRequest<Omit<BranchPlan, 'key'>>('branches', {
         key, type: 'task', summary: '',
         issueKeys: issues.filter((issue) => (issue.parentKey || issue.key) === key).map((issue) => issue.key),
@@ -147,6 +162,34 @@ export default function App() {
     return () => window.clearInterval(interval);
   }, [activeTimer.isRunning, activeTimer.issueKey]);
 
+  useEffect(() => {
+    if (!activeTimer.issueKey || (!activeTimer.isRunning && !pausedByMeeting)) return;
+    const checkMeetingCollision = () => {
+      const decision = evaluateMeetingTimerCollision(
+        activeTimer,
+        meetings,
+        pausedByMeeting,
+        Date.now(),
+        dismissedMeetings.current,
+      );
+      if (decision.action === 'pause' && decision.pausedByMeeting) {
+        setActiveTimer((timer) => ({ ...timer, isRunning: false }));
+        setPausedByMeeting(decision.pausedByMeeting);
+        setNotice(`${messages['meetings.timer.paused']} ${decision.pausedByMeeting.meetingTitle}`);
+      } else if (decision.action === 'update-pause') {
+        setPausedByMeeting(decision.pausedByMeeting);
+      } else if (decision.action === 'resume') {
+        const resumedTitle = pausedByMeeting?.meetingTitle || '';
+        setPausedByMeeting(null);
+        setActiveTimer((timer) => ({ ...timer, isRunning: true }));
+        setNotice(`${messages['meetings.timer.resumed']} ${resumedTitle}`.trim());
+      }
+    };
+    checkMeetingCollision();
+    const interval = window.setInterval(checkMeetingCollision, 1000);
+    return () => window.clearInterval(interval);
+  }, [activeTimer.issueKey, activeTimer.isRunning, meetings, pausedByMeeting]);
+
   function selectConnection(id: string) {
     if (writeLock.current || branchLock.current || isRefreshing || activeTimer.seconds > 0 || activeTimer.isRunning) {
       setError(messages['timer.switch']);
@@ -157,6 +200,7 @@ export default function App() {
     setFilter('all');
     setUser(undefined);
     setSelectedIssueId('');
+    setPausedByMeeting(null);
     setActiveTimer({ issueKey: '', issueTitle: '', seconds: 0, isRunning: false });
     setQuery(connections.find((candidate) => candidate.id === id)?.query || '');
     setConnectionId(id);
@@ -169,6 +213,10 @@ export default function App() {
       setError(messages['timer.switch']);
       return;
     }
+    for (const colliding of findCollidingMeetings(meetings, Date.now())) {
+      dismissedMeetings.current.add(colliding.id);
+    }
+    setPausedByMeeting(null);
     setActiveTimer((timer) => ({
       issueKey: issue.key, issueTitle: issue.title,
       seconds: timer.issueKey === issue.key ? timer.seconds : 0,
@@ -277,7 +325,8 @@ export default function App() {
     setIsRefreshing(true);
     try {
       const loaded = await loadConnections();
-      if (loaded?.some((candidate) => candidate.id === connectionId)) await loadIssues().catch(() => {});
+      if (loaded?.some((candidate) => candidate.id === connectionId)) await loadIssues().catch(() => { });
+      await loadMeetingsBackground();
     } finally {
       setIsRefreshing(false);
     }
@@ -291,6 +340,11 @@ export default function App() {
         hasActiveTimer={activeTimer.isRunning} user={user?.displayName || ''} disabled={interactionPending || isRefreshing} />
       {error && <div role="alert" className="p-3 text-[#FF5C5C] border-b border-[#2E3240]">{error}</div>}
       {notice && <div role="status" className="p-2 text-[#34C759] border-b border-[#2E3240]">{notice}</div>}
+      {pausedByMeeting && !activeTimer.isRunning && (
+        <div role="status" className="px-3 py-1.5 bg-[#2B2618] text-[#F5C451] border-b border-[#5C4E24] text-[11px]">
+          {messages['meetings.timer.paused']} <span className="font-semibold">{pausedByMeeting.meetingTitle}</span> ({activeTimer.issueKey})
+        </div>
+      )}
       <form onSubmit={(event) => { event.preventDefault(); refresh(); }} className="flex items-center gap-2 p-2 bg-[#1E2028]">
         <label htmlFor="jira-query" className="text-[#7D8395] font-mono">{messages.query}</label>
         <input id="jira-query" value={query} onChange={(event) => setQuery(event.target.value)} disabled={interactionPending || isRefreshing}
@@ -302,7 +356,7 @@ export default function App() {
       {!connection && <button onClick={() => setSettingsOpen(true)} className="p-4 text-[#5384F7]">{messages['no.connection']}</button>}
       <div className="flex-1 flex flex-col min-h-0 relative">
         {activeTab === 'issues' && <IssuesScreen issues={visibleIssues} selectedIssueId={selectedIssueId} taskBranches={taskBranches}
-          activeFilter={filter} onFilterChange={(scope) => { if (!interactionPending && !isRefreshing) { setFilter(scope); void loadIssues(connectionId, query, scope).catch(() => {}); } }}
+          activeFilter={filter} onFilterChange={(scope) => { if (!interactionPending && !isRefreshing) { setFilter(scope); void loadIssues(connectionId, query, scope).catch(() => { }); } }}
           onSelectIssue={(issue) => setSelectedIssueId(issue.id)} onOpenDetails={(issue) => { if (issue) void openIssue(issue.key); }}
           onStartTracking={requestTracking} activeTrackingKey={activeTimer.isRunning ? activeTimer.issueKey : undefined}
           onUpdateSubtaskDone={(id, event) => { event.stopPropagation(); const subtask = issues.flatMap((issue) => issue.subtasks || []).find((item) => item.id === id); if (subtask) void openIssue(subtask.key); }}
@@ -313,25 +367,35 @@ export default function App() {
           repositoryId={connectionId} revision={revision} writing={interactionPending} onMutate={mutate}
           commitMessageTemplate={connection?.commitMessageTemplate ?? ''} />
           : <div className="p-4 text-[#7D8395]">{messages['no.issue']}</div>)}
-        {activeTab === 'tracker' && <TrackerTab activeTimer={activeTimer} issues={issues} repositoryId={connectionId}
-          revision={revision} writing={interactionPending} onSelectIssue={(issue) => { void requestTracking(issue); }}
-          onToggleTimer={() => {
-            if (interactionPending || !activeTimer.issueKey) return;
-            if (activeTimer.isRunning) setActiveTimer((timer) => ({ ...timer, isRunning: false }));
-            else void requestTracking({ key: activeTimer.issueKey, title: activeTimer.issueTitle });
-          }}
-          onResetTimer={() => { if (!interactionPending) setActiveTimer((timer) => ({ ...timer, seconds: 0, isRunning: false, startedAt: undefined })); }}
-          onLogWork={async (key, duration, body, started) => {
-            setActiveTimer((timer) => ({ ...timer, isRunning: false }));
-            await mutate('worklog', { key, duration, body, started });
-            setActiveTimer((timer) => ({ ...timer, seconds: 0, isRunning: false, startedAt: undefined }));
-          }} />}
-        {activeTab === 'meetings' && <MeetingsTab issues={issues} writing={interactionPending}
-          onStartTracking={(issue, event) => { void requestTracking(issue, event); }}
-          onOpenIssue={(key) => { void openIssue(key); }}
-          onLogWork={async (key, duration, body, started) => {
-            await mutate('worklog', { key, duration, body, started });
-          }} />}
+          {activeTab === 'tracker' && <TrackerTab activeTimer={activeTimer} pausedByMeeting={pausedByMeeting} issues={issues} repositoryId={connectionId}
+            revision={revision} writing={interactionPending} onSelectIssue={(issue) => { void requestTracking(issue); }}
+            onToggleTimer={() => {
+              if (interactionPending || !activeTimer.issueKey) return;
+              if (activeTimer.isRunning) {
+                setPausedByMeeting(null);
+                setActiveTimer((timer) => ({ ...timer, isRunning: false }));
+              } else {
+                void requestTracking({ key: activeTimer.issueKey, title: activeTimer.issueTitle });
+              }
+            }}
+            onResetTimer={() => {
+              if (!interactionPending) {
+                setPausedByMeeting(null);
+                setActiveTimer((timer) => ({ ...timer, seconds: 0, isRunning: false, startedAt: undefined }));
+              }
+            }}
+            onLogWork={async (key, duration, body, started) => {
+              setPausedByMeeting(null);
+              setActiveTimer((timer) => ({ ...timer, isRunning: false }));
+              await mutate('worklog', { key, duration, body, started });
+              setActiveTimer((timer) => ({ ...timer, seconds: 0, isRunning: false, startedAt: undefined }));
+            }} />}
+            {activeTab === 'meetings' && <MeetingsTab issues={issues} initialMeetings={meetings} onMeetingsChange={setMeetings} writing={interactionPending}
+              onStartTracking={(issue, event) => { void requestTracking(issue, event); }}
+              onOpenIssue={(key) => { void openIssue(key); }}
+              onLogWork={async (key, duration, body, started) => {
+                await mutate('worklog', { key, duration, body, started });
+              }} />}
       </div>
       {branchFlow && <BranchDialog plan={branchFlow.plan} busy={branchBusy} error={branchError}
         onConfirm={(root, name, base) => { void confirmBranch(root, name, base); }}

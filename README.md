@@ -30,6 +30,15 @@ Use **Start Task**, **Start**, a subtask's timer action, or the Tracker issue se
 
 Requests use a direct HTTP client rather than the Tasks Jira client, with IntelliJ's certificate manager and the runtime's default proxy selector. Connection establishment has a 15-second timeout; each API request has a 30-second timeout. Redirects are rejected to avoid forwarding credentials to an SSO or different host. Authentication, permission, proxy, TLS, timeout, and non-JSON responses have distinct errors. This independence does not guarantee a fix for failures caused by network, proxy, certificates, or Jira itself.
 
+### Microsoft Teams & Outlook Meetings Sync
+
+Open the **Meetings** tab to sync upcoming calendar events (for the next 14 days) and link them to Jira tickets:
+
+- **Sync Modes**: Configure either a published Outlook/Teams **ICS Calendar Feed URL** (`https://` or `webcal://`) or a **Microsoft Graph API** access token (`Calendars.Read`) directly inside the **Meetings** tab (**Configure Teams Sync**) or under **Settings > Tools > Jira Issue Tracker > Teams Meetings**. Graph tokens are stored in IntelliJ Password Safe.
+- **Jira Ticket Linking**: Map any meeting to a Jira issue from your loaded issue list or by entering a custom issue key (e.g., `PROJ-123`). Enable **Apply to all recurring meetings with this title/series** to remember the mapping across recurring ceremonies (such as Daily Standups or Sprint Planning), or include `[PROJ-123]` in the meeting title for automatic matching.
+- **Quick Actions**: Start a timer for the linked Jira ticket or log the meeting's exact duration and start time to Jira in one click.
+- **Automatic Collision Pause & Resume**: When a scheduled meeting starts while a task timer is running, the plugin automatically pauses the task timer for the duration of the meeting and resumes it once the meeting finishes.
+
 ### Limitations
 
 - Jira Server/Data Center is supported; Jira Cloud remains outside the supported scope.
@@ -49,6 +58,16 @@ Use a JDK compatible with the selected IntelliJ platform, Node.js, npm, and the 
 4. Find the installable plugin ZIP under `build\distributions\`.
 
 The plugin requires a runtime with JCEF support and the bundled Git plugin enabled; IntelliJ's Tasks plugin is not required. Install the ZIP using **Install Plugin from Disk**, restart if prompted, and open **Jira Issue Tracker**.
+
+## Publishing to JetBrains Marketplace
+
+1. Generate a Permanent Token on [JetBrains Marketplace](https://plugins.jetbrains.com/author/me/tokens).
+2. Provide the token via the `PUBLISH_TOKEN` environment variable or `intellijPublishToken` Gradle property and run `publishPlugin`:
+   ```powershell
+   $env:PUBLISH_TOKEN = "<your-marketplace-token>"
+   .\gradlew.bat publishPlugin
+   ```
+   Or upload the built distribution zip (`build/distributions/jira-issue-tracker-intellij-plugin-0.1.3.zip`) directly at <https://plugins.jetbrains.com/plugin/add>.
 
 ## Standalone UI preview
 

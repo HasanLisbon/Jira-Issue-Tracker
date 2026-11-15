@@ -1,8 +1,42 @@
 <idea-plugin>
     <id>dev.jiraissuetracker</id>
     <name>Jira Issue Tracker</name>
-    <vendor>Jira Issue Tracker</vendor>
-    <description>Browse Jira issues, track and log work, change status, and discuss issues using an independent Jira connection.</description>
+    <vendor url="https://github.com/HasanLisbon/Jira-Issue-Tracker">Jira Issue Tracker</vendor>
+    <description><![CDATA[
+<p>
+  <strong>Jira Issue Tracker</strong> is an integrated IntelliJ IDEA tool window for browsing Jira Server &amp; Data Center issues, automating Git task branch workflows, tracking time with meeting-aware timers, and syncing upcoming Microsoft Teams / Outlook meetings directly inside your IDE.
+</p>
+
+<h2>Key Features</h2>
+<ul>
+  <li>
+    <strong>Rich Jira Issue Browser &amp; Filtering:</strong> Search issues with custom JQL queries and quick filters (<em>Assigned to Me</em>, <em>Reported by Me</em>, <em>Recently Updated</em>, <em>Active Sprint</em>), inspect subtasks and progress bars, transition workflow statuses, and read or reply to issue comments.
+  </li>
+  <li>
+    <strong>Git Branch Automation:</strong> Automatically detects existing local and remote-tracking branches linked to an issue (or its parent ticket) and offers one-click creation and checkout of standardized <code>feature/</code> or <code>bugfix/</code> branches when starting a timer.
+  </li>
+  <li>
+    <strong>Time Tracker &amp; Worklog Management:</strong> Built-in live stopwatch and manual duration logging with timezone-aware start times, work descriptions, worklog history, and customizable commit message templates (<code>{issueKey}: {summary}</code>).
+  </li>
+  <li>
+    <strong>Microsoft Teams &amp; Outlook Meetings Sync:</strong> Sync upcoming calendar events via a published Outlook/Teams ICS feed URL (no Azure admin approval needed) or Microsoft Graph API token, link single or recurring meetings to Jira tickets, and log meeting durations to Jira in one click.
+  </li>
+  <li>
+    <strong>Smart Meeting Collision Pause &amp; Resume:</strong> Automatically pauses any active task timer when a scheduled meeting starts and resumes tracking your task as soon as the meeting ends.
+  </li>
+  <li>
+    <strong>Multiple Connections &amp; Secure Credentials:</strong> Configure multiple named Jira Server/Data Center profiles with Basic Auth or Personal Access Tokens (Bearer) stored securely in IntelliJ Password Safe.
+  </li>
+</ul>
+    ]]></description>
+    <change-notes><![CDATA[
+<ul>
+  <li>Added <strong>Meetings</strong> tab to sync upcoming Microsoft Teams / Outlook meetings via ICS Calendar Feed URL or Microsoft Graph API.</li>
+  <li>Added persistent single and recurring meeting-to-Jira ticket mapping with one-click meeting worklog submission.</li>
+  <li>Added automatic task timer pause during colliding meetings and automatic resumption when the meeting ends.</li>
+  <li>Expanded compatibility across IntelliJ IDEA 2024.2 through 2026.x+.</li>
+</ul>
+    ]]></change-notes>
     <depends>com.intellij.modules.platform</depends>
     <depends optional="true" config-file="jcef.xml">com.intellij.modules.jcef</depends>
     <depends>Git4Idea</depends>

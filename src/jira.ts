@@ -1,4 +1,4 @@
-import type { JiraIssue, Subtask, TeamsMeeting, MeetingTicketMapping } from './types.ts';
+import type { JiraIssue, Subtask, TeamsMeeting, MeetingTicketMapping, ActiveTimer, MeetingTimerPause } from './types.ts';
 
 export interface JiraConnection {
   id: string;
@@ -209,4 +209,68 @@ export function resolveMeetingTicket(
   }
 
   return null;
+}
+
+export function findCollidingMeetings(
+  meetings: Array<Pick<TeamsMeeting, 'id' | 'title' | 'start' | 'end'>>,
+  nowMs = Date.now(),
+  dismissedMeetingIds: ReadonlySet<string> = new Set(),
+): Array<Pick<TeamsMeeting, 'id' | 'title' | 'start' | 'end'>> {
+  return meetings.filter((meeting) => {
+    if (dismissedMeetingIds.has(meeting.id)) return false;
+    const startMs = Date.parse(meeting.start);
+    const endMs = Date.parse(meeting.end);
+    return Number.isFinite(startMs) && Number.isFinite(endMs) && startMs <= nowMs && nowMs < endMs;
+  });
+}
+
+export interface MeetingCollisionDecision {
+  action: 'none' | 'pause' | 'resume' | 'update-pause';
+  pausedByMeeting: MeetingTimerPause | null;
+}
+
+export function evaluateMeetingTimerCollision(
+  activeTimer: Pick<ActiveTimer, 'issueKey' | 'isRunning'>,
+  meetings: Array<Pick<TeamsMeeting, 'id' | 'title' | 'start' | 'end'>>,
+  pausedByMeeting: MeetingTimerPause | null,
+  nowMs = Date.now(),
+  dismissedMeetingIds: ReadonlySet<string> = new Set(),
+): MeetingCollisionDecision {
+  if (!activeTimer.issueKey) {
+    return { action: 'none', pausedByMeeting: null };
+  }
+
+  const activeCollisions = findCollidingMeetings(meetings, nowMs, dismissedMeetingIds);
+
+  if (activeCollisions.length > 0) {
+    const latestEnding = activeCollisions.reduce((best, current) =>
+      Date.parse(current.end) > Date.parse(best.end) ? current : best,
+    );
+    const nextPause: MeetingTimerPause = {
+      meetingId: latestEnding.id,
+      meetingTitle: latestEnding.title,
+      meetingEnd: latestEnding.end,
+      issueKey: activeTimer.issueKey,
+    };
+
+    if (activeTimer.isRunning) {
+      return { action: 'pause', pausedByMeeting: nextPause };
+    }
+
+    if (
+      pausedByMeeting &&
+      pausedByMeeting.issueKey === activeTimer.issueKey &&
+      (pausedByMeeting.meetingId !== nextPause.meetingId || pausedByMeeting.meetingEnd !== nextPause.meetingEnd)
+    ) {
+      return { action: 'update-pause', pausedByMeeting: nextPause };
+    }
+
+    return { action: 'none', pausedByMeeting };
+  }
+
+  if (pausedByMeeting && pausedByMeeting.issueKey === activeTimer.issueKey && !activeTimer.isRunning) {
+    return { action: 'resume', pausedByMeeting: null };
+  }
+
+  return { action: 'none', pausedByMeeting: null };
 }

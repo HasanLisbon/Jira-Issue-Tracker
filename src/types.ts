@@ -94,3 +94,10 @@ export interface ActiveTimer {
   isRunning: boolean;
   startedAt?: Date;
 }
+
+export interface MeetingTimerPause {
+  meetingId: string;
+  meetingTitle: string;
+  meetingEnd: string;
+  issueKey: string;
+}

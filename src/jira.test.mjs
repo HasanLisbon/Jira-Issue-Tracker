@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { tsImport } from 'tsx/esm/api';
 
-const { mapIssue, cestInput, worklogStarted, jiraRequest, formatCommitMessage, resolveMeetingTicket } = await tsImport('./jira.ts', import.meta.url);
+const { mapIssue, cestInput, worklogStarted, jiraRequest, formatCommitMessage, resolveMeetingTicket, evaluateMeetingTimerCollision } = await tsImport('./jira.ts', import.meta.url);
 const { prepareTracking, branchNames, repositoryKey, belongsToRepository } = await tsImport('./branches.ts', import.meta.url);
 
 test('normalizes web, https and ssh repository URLs to the same key', () => {
@@ -17,7 +17,7 @@ test('hides a task only when all its linked branches belong to other repositorie
   assert.equal(belongsToRepository([], origins), true);
   assert.equal(belongsToRepository([{ name: 'a', repositoryUrl: 'https://git.test/scm/proj/other.git' }], origins), false);
   assert.equal(belongsToRepository([{ name: 'a', repositoryUrl: 'https://git.test/scm/proj/other.git' },
-    { name: 'b', repositoryUrl: 'ssh://git@git.test:7999/proj/repo.git' }], origins), true);
+  { name: 'b', repositoryUrl: 'ssh://git@git.test:7999/proj/repo.git' }], origins), true);
   assert.equal(belongsToRepository([{ name: 'a', repositoryUrl: 'https://git.test/scm/x/y.git' }], []), true);
   assert.equal(belongsToRepository([{ name: 'a', repositoryUrl: 'https://git.test/scm/x/y.git' }], origins, ['feature/T-1']), true);
 });
@@ -25,10 +25,12 @@ test('hides a task only when all its linked branches belong to other repositorie
 test('displays branch names without ref prefixes while keeping remote identity and removing duplicates', () => {
   assert.deepEqual(branchNames({ repositories: [] }), []);
   assert.deepEqual(branchNames({ repositories: [{ matches: ['refs/heads/feature/TEST-1'] }] }), ['feature/TEST-1']);
-  assert.deepEqual(branchNames({ repositories: [
-    { matches: ['refs/heads/feature/TEST-1', 'refs/remotes/origin/bugfix/TEST-1'] },
-    { matches: ['refs/heads/feature/TEST-1'] },
-  ] }), ['feature/TEST-1', 'origin/bugfix/TEST-1']);
+  assert.deepEqual(branchNames({
+    repositories: [
+      { matches: ['refs/heads/feature/TEST-1', 'refs/remotes/origin/bugfix/TEST-1'] },
+      { matches: ['refs/heads/feature/TEST-1'] },
+    ]
+  }), ['feature/TEST-1', 'origin/bugfix/TEST-1']);
 });
 
 test('checks the parent ticket branch but leaves subtask timer identity unchanged', async () => {
@@ -90,13 +92,15 @@ test('formats commit messages with issue key and summary placeholders', () => {
 });
 
 test('maps Jira values without replacing workflow names with demo statuses', () => {
-  const issue = mapIssue({ id: '1', key: 'TEST-1', fields: {
-    summary: 'Real Jira issue', status: { name: 'Ready for verification' },
-    priority: { name: 'Highest' }, assignee: { name: 'tester', displayName: 'Test User' },
-    reporter: { name: 'reporter', displayName: 'Test Reporter' },
-    timetracking: { originalEstimate: '4h', timeSpent: '1h' },
-    parent: { key: 'TEST-2' }, description: '<script>not HTML</script>',
-  } }, { name: 'tester' });
+  const issue = mapIssue({
+    id: '1', key: 'TEST-1', fields: {
+      summary: 'Real Jira issue', status: { name: 'Ready for verification' },
+      priority: { name: 'Highest' }, assignee: { name: 'tester', displayName: 'Test User' },
+      reporter: { name: 'reporter', displayName: 'Test Reporter' },
+      timetracking: { originalEstimate: '4h', timeSpent: '1h' },
+      parent: { key: 'TEST-2' }, description: '<script>not HTML</script>',
+    }
+  }, { name: 'tester' });
   assert.equal(issue.status, 'Ready for verification');
   assert.equal(issue.timeSpent, '1h');
   assert.equal(issue.estimate, '4h');
@@ -124,11 +128,13 @@ test('maps empty, single and multiple subtasks including mixed completion', () =
 });
 
 test('maps discovered sprint fields in both Server representations', () => {
-  const issue = mapIssue({ id: '1', key: 'TEST-1', fields: {
-    summary: 'Issue', status: { name: 'Open' },
-    customfield_123: [{ name: 'Active sprint', state: 'active' }],
-    customfield_456: ['Sprint@123[id=1,name=Prior sprint,state=CLOSED]'],
-  } });
+  const issue = mapIssue({
+    id: '1', key: 'TEST-1', fields: {
+      summary: 'Issue', status: { name: 'Open' },
+      customfield_123: [{ name: 'Active sprint', state: 'active' }],
+      customfield_456: ['Sprint@123[id=1,name=Prior sprint,state=CLOSED]'],
+    }
+  });
   assert.equal(issue.sprintInfo, 'Active sprint, Prior sprint');
 });
 
@@ -233,4 +239,69 @@ test('resolves meeting Jira tickets from instance mapping, recurring series mapp
     issues,
   );
   assert.equal(unlinked, null);
+});
+
+test('stops running task timer during colliding meeting and resumes after meeting ends', () => {
+  const meetings = [
+    {
+      id: 'mtg-1',
+      title: 'Sprint Sync',
+      start: '2026-11-16T10:00:00Z',
+      end: '2026-11-16T10:30:00Z',
+    },
+  ];
+
+  // Before meeting starts (09:55): timer stays running
+  const before = evaluateMeetingTimerCollision(
+    { issueKey: 'PROJ-1', isRunning: true },
+    meetings,
+    null,
+    Date.parse('2026-11-16T09:55:00Z'),
+  );
+  assert.equal(before.action, 'none');
+  assert.equal(before.pausedByMeeting, null);
+
+  // During meeting (10:05): running timer is paused for the meeting
+  const during = evaluateMeetingTimerCollision(
+    { issueKey: 'PROJ-1', isRunning: true },
+    meetings,
+    null,
+    Date.parse('2026-11-16T10:05:00Z'),
+  );
+  assert.equal(during.action, 'pause');
+  assert.deepEqual(during.pausedByMeeting, {
+    meetingId: 'mtg-1',
+    meetingTitle: 'Sprint Sync',
+    meetingEnd: '2026-11-16T10:30:00Z',
+    issueKey: 'PROJ-1',
+  });
+
+  // Still in meeting while paused (10:20): stays paused
+  const stillPaused = evaluateMeetingTimerCollision(
+    { issueKey: 'PROJ-1', isRunning: false },
+    meetings,
+    during.pausedByMeeting,
+    Date.parse('2026-11-16T10:20:00Z'),
+  );
+  assert.equal(stillPaused.action, 'none');
+
+  // After meeting ends (10:30): timer automatically resumes
+  const after = evaluateMeetingTimerCollision(
+    { issueKey: 'PROJ-1', isRunning: false },
+    meetings,
+    during.pausedByMeeting,
+    Date.parse('2026-11-16T10:30:00Z'),
+  );
+  assert.equal(after.action, 'resume');
+  assert.equal(after.pausedByMeeting, null);
+
+  // If user manually overrode/dismissed the meeting, it does not re-pause
+  const overridden = evaluateMeetingTimerCollision(
+    { issueKey: 'PROJ-1', isRunning: true },
+    meetings,
+    null,
+    Date.parse('2026-11-16T10:15:00Z'),
+    new Set(['mtg-1']),
+  );
+  assert.equal(overridden.action, 'none');
 });

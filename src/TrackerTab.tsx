@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, RotateCcw, Send, History } from 'lucide-react';
-import type { ActiveTimer, JiraIssue } from './types.ts';
+import type { ActiveTimer, JiraIssue, MeetingTimerPause } from './types.ts';
 import { cestInput, worklogStarted, jiraRequest } from './jira.ts';
 import type { JiraWorklog } from './jira.ts';
 import { messages } from './messages.ts';
 
 interface TrackerTabProps {
   activeTimer: ActiveTimer;
+  pausedByMeeting?: MeetingTimerPause | null;
   onToggleTimer: () => void;
   onResetTimer: () => void;
   onLogWork: (key: string, duration: string, comment: string, started: string) => Promise<void>;
@@ -91,6 +92,11 @@ export const TrackerTab: React.FC<TrackerTabProps> = (props) => {
       </div>
       <div className="bg-[#232630] border border-[#2E3240] rounded-lg p-5 flex flex-col items-center text-center">
         <div className="font-mono text-4xl font-semibold tracking-wider text-white tabular-nums mb-4">{formatTime(activeTimer.seconds)}</div>
+        {props.pausedByMeeting && !activeTimer.isRunning && (
+          <div role="status" className="mb-3 px-2.5 py-1.5 rounded bg-[#2B2618] border border-[#5C4E24] text-[#F5C451] text-[11px]">
+            {messages['meetings.timer.paused']} <span className="font-semibold">{props.pausedByMeeting.meetingTitle}</span>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <button disabled={disabled || !activeTimer.issueKey} onClick={props.onToggleTimer} className="flex items-center gap-2 px-4 py-2 rounded bg-[#3B68FF] text-white disabled:opacity-40">
             {activeTimer.isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}{messages[activeTimer.isRunning ? 'timer.pause' : 'timer.start']}
