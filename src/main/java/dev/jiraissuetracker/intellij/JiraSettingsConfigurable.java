@@ -54,6 +54,9 @@ public final class JiraSettingsConfigurable implements Configurable {
     private JList<ServerEditor> serverList;
     private JButton removeButton;
     private JTextField commitMessageTemplate;
+    private JTextField teamsIcsUrl;
+    private JCheckBox teamsUseGraph;
+    private JPasswordField teamsGraphToken;
 
     @Override
     public String getDisplayName() {
@@ -152,6 +155,41 @@ public final class JiraSettingsConfigurable implements Configurable {
                 commitMessage
         );
 
+        JPanel teamsPanel = new JPanel(
+                new GridLayout(0, 1, 0, 6)
+        );
+        teamsIcsUrl = new JTextField();
+        JLabel icsLabel = new JLabel(
+                MESSAGES.getString("meetings.ics.url")
+        );
+        icsLabel.setLabelFor(teamsIcsUrl);
+        teamsPanel.add(icsLabel);
+        teamsPanel.add(teamsIcsUrl);
+        teamsPanel.add(new JLabel(
+                MESSAGES.getString("meetings.ics.hint")
+        ));
+
+        teamsUseGraph = new JCheckBox(
+                MESSAGES.getString("settings.teams.use.graph")
+        );
+        teamsPanel.add(teamsUseGraph);
+
+        teamsGraphToken = new JPasswordField();
+        JLabel graphLabel = new JLabel(
+                MESSAGES.getString("meetings.graph.token")
+        );
+        graphLabel.setLabelFor(teamsGraphToken);
+        teamsPanel.add(graphLabel);
+        teamsPanel.add(teamsGraphToken);
+        teamsPanel.add(new JLabel(
+                MESSAGES.getString("meetings.graph.hint")
+        ));
+
+        tabs.addTab(
+                MESSAGES.getString("settings.teams.tab"),
+                new JScrollPane(teamsPanel)
+        );
+
         JSplitPane split = new JSplitPane(
                 JSplitPane.VERTICAL_SPLIT,
                 master,
@@ -242,6 +280,15 @@ public final class JiraSettingsConfigurable implements Configurable {
             return true;
         }
 
+        if (!Objects.equals(
+                Objects.requireNonNullElse(savedState.teamsIcsUrl, ""),
+                teamsIcsUrl.getText().trim()
+        )
+                || savedState.teamsUseGraph != teamsUseGraph.isSelected()
+                || hasEnteredTeamsToken()) {
+            return true;
+        }
+
         if (saved.size() != servers.size()) {
             return true;
         }
@@ -285,10 +332,21 @@ public final class JiraSettingsConfigurable implements Configurable {
                 }
             }
 
+            char[] enteredTeamsChars = teamsGraphToken.getPassword();
+            String enteredTeamsSecret;
+            try {
+                enteredTeamsSecret = new String(enteredTeamsChars);
+            } finally {
+                Arrays.fill(enteredTeamsChars, '\0');
+            }
+
             JiraSettings.getInstance().save(
                     connections,
                     enteredSecrets,
-                    commitMessageTemplate.getText()
+                    commitMessageTemplate.getText(),
+                    teamsIcsUrl.getText().trim(),
+                    teamsUseGraph.isSelected(),
+                    enteredTeamsSecret
             );
 
             reset();
@@ -322,6 +380,11 @@ public final class JiraSettingsConfigurable implements Configurable {
         JiraSettings.SettingsState savedState =
                 JiraSettings.getInstance().getState();
         commitMessageTemplate.setText(savedState.commitMessageTemplate);
+        teamsIcsUrl.setText(
+                Objects.requireNonNullElse(savedState.teamsIcsUrl, "")
+        );
+        teamsUseGraph.setSelected(savedState.teamsUseGraph);
+        teamsGraphToken.setText("");
         clearEditors();
 
         for (JiraSettings.ConnectionState connection : savedState.servers) {
@@ -500,6 +563,24 @@ public final class JiraSettingsConfigurable implements Configurable {
         serverList = null;
         removeButton = null;
         commitMessageTemplate = null;
+        if (teamsGraphToken != null) {
+            teamsGraphToken.setText("");
+        }
+        teamsIcsUrl = null;
+        teamsUseGraph = null;
+        teamsGraphToken = null;
+    }
+
+    private boolean hasEnteredTeamsToken() {
+        if (teamsGraphToken == null) {
+            return false;
+        }
+        char[] entered = teamsGraphToken.getPassword();
+        try {
+            return entered.length != 0;
+        } finally {
+            Arrays.fill(entered, '\0');
+        }
     }
 
     private final class ServerEditor extends JPanel {

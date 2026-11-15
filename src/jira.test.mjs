@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { tsImport } from 'tsx/esm/api';
 
-const { mapIssue, cestInput, worklogStarted, jiraRequest, formatCommitMessage } = await tsImport('./jira.ts', import.meta.url);
+const { mapIssue, cestInput, worklogStarted, jiraRequest, formatCommitMessage, resolveMeetingTicket } = await tsImport('./jira.ts', import.meta.url);
 const { prepareTracking, branchNames, repositoryKey, belongsToRepository } = await tsImport('./branches.ts', import.meta.url);
 
 test('normalizes web, https and ssh repository URLs to the same key', () => {
@@ -183,4 +183,54 @@ test('sends Jira actions through the authenticated local bridge and propagates r
     else globalThis.window = originalWindow;
     globalThis.fetch = originalFetch;
   }
+});
+
+test('resolves meeting Jira tickets from instance mapping, recurring series mapping, and title keys', () => {
+  const issues = [{ key: 'PROJ-10', title: 'Sprint Ceremony' }, { key: 'PROJ-99', title: 'Specific Review' }];
+  const mappings = [
+    { matchKey: 'daily standup', matchType: 'series', meetingTitle: 'Daily Standup', issueKey: 'PROJ-10', issueTitle: 'Fallback' },
+    { matchKey: 'evt-override', matchType: 'instance', meetingTitle: 'Daily Standup', issueKey: 'PROJ-99', issueTitle: '' },
+  ];
+
+  const seriesResolved = resolveMeetingTicket(
+    { id: 'evt-1', seriesKey: 'daily standup', title: 'Daily Standup' },
+    mappings,
+    issues,
+  );
+  assert.deepEqual(seriesResolved, {
+    issueKey: 'PROJ-10',
+    issueTitle: 'Sprint Ceremony',
+    source: 'series',
+    matchKey: 'daily standup',
+    matchType: 'series',
+  });
+
+  const instanceResolved = resolveMeetingTicket(
+    { id: 'evt-override', seriesKey: 'daily standup', title: 'Daily Standup' },
+    mappings,
+    issues,
+  );
+  assert.deepEqual(instanceResolved, {
+    issueKey: 'PROJ-99',
+    issueTitle: 'Specific Review',
+    source: 'instance',
+    matchKey: 'evt-override',
+    matchType: 'instance',
+  });
+
+  const autoResolved = resolveMeetingTicket(
+    { id: 'evt-2', seriesKey: 'refinement', title: '[PROJ-10] Backlog Refinement' },
+    [],
+    issues,
+  );
+  assert.equal(autoResolved.issueKey, 'PROJ-10');
+  assert.equal(autoResolved.issueTitle, 'Sprint Ceremony');
+  assert.equal(autoResolved.source, 'auto');
+
+  const unlinked = resolveMeetingTicket(
+    { id: 'evt-3', seriesKey: 'coffee', title: 'Team Coffee' },
+    mappings,
+    issues,
+  );
+  assert.equal(unlinked, null);
 });

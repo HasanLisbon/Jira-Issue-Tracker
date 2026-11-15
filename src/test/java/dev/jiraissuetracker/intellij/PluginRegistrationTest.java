@@ -37,6 +37,21 @@ public class PluginRegistrationTest {
                     toolWindow.getAttribute("factoryClass")
             );
             assertNotNull(Class.forName(toolWindow.getAttribute("factoryClass")));
+
+            NodeList dependsNodes = document.getElementsByTagName("depends");
+            boolean foundOptionalJcef = false;
+            for (int i = 0; i < dependsNodes.getLength(); i++) {
+                Element dep = (Element) dependsNodes.item(i);
+                if ("com.intellij.modules.jcef".equals(dep.getTextContent().trim())) {
+                    assertEquals("true", dep.getAttribute("optional"));
+                    assertEquals("jcef.xml", dep.getAttribute("config-file"));
+                    foundOptionalJcef = true;
+                }
+            }
+            assertTrue("JCEF dependency must be marked optional with config-file for 2024.x–2026.x+ compatibility", foundOptionalJcef);
+            assertEquals("No hard v2 <dependencies> block should restrict 2024.x compatibility", 0, document.getElementsByTagName("dependencies").getLength());
         }
+        Path jcefDescriptorPath = Path.of("src", "main", "resources", "META-INF", "jcef.xml");
+        assertTrue("The optional JCEF config-file descriptor must exist", Files.isRegularFile(jcefDescriptorPath));
     }
 }

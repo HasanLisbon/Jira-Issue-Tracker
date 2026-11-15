@@ -55,7 +55,37 @@ export interface JiraIssue {
 
 export type FilterKey = 'assigned' | 'reported' | 'recent' | 'sprint';
 
-export type ActiveTab = 'issues' | 'tracker' | 'details';
+export type ActiveTab = 'issues' | 'tracker' | 'details' | 'meetings';
+
+export interface TeamsMeeting {
+  id: string;
+  seriesKey: string;
+  title: string;
+  start: string;
+  end: string;
+  durationMinutes: number;
+  durationFormatted: string;
+  joinUrl?: string;
+  isTeamsMeeting: boolean;
+  organizer?: string;
+}
+
+export interface MeetingTicketMapping {
+  matchKey: string;
+  matchType: 'series' | 'instance';
+  meetingTitle: string;
+  issueKey: string;
+  issueTitle: string;
+}
+
+export interface TeamsMeetingsResponse {
+  configured: boolean;
+  mode: 'ics' | 'graph';
+  icsUrl: string;
+  hasGraphToken: boolean;
+  meetings: TeamsMeeting[];
+  mappings: MeetingTicketMapping[];
+}
 
 export interface ActiveTimer {
   issueKey: string;

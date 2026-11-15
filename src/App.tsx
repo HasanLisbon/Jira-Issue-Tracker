@@ -8,6 +8,7 @@ import { TopBar } from './TopBar.tsx';
 import { IssuesScreen } from './IssuesScreen.tsx';
 import { DetailsTab } from './DetailsTab.tsx';
 import { TrackerTab } from './TrackerTab.tsx';
+import { MeetingsTab } from './MeetingsTab.tsx';
 import { SettingsModal } from './SettingsModal.tsx';
 import { jiraRequest, mapIssue } from './jira.ts';
 import type { JiraConnection, JiraUser, RawIssue } from './jira.ts';
@@ -324,6 +325,12 @@ export default function App() {
             setActiveTimer((timer) => ({ ...timer, isRunning: false }));
             await mutate('worklog', { key, duration, body, started });
             setActiveTimer((timer) => ({ ...timer, seconds: 0, isRunning: false, startedAt: undefined }));
+          }} />}
+        {activeTab === 'meetings' && <MeetingsTab issues={issues} writing={interactionPending}
+          onStartTracking={(issue, event) => { void requestTracking(issue, event); }}
+          onOpenIssue={(key) => { void openIssue(key); }}
+          onLogWork={async (key, duration, body, started) => {
+            await mutate('worklog', { key, duration, body, started });
           }} />}
       </div>
       {branchFlow && <BranchDialog plan={branchFlow.plan} busy={branchBusy} error={branchError}

@@ -10,6 +10,7 @@ import com.intellij.openapi.components.RoamingType;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -63,10 +64,21 @@ public final class JiraSettings
         public boolean bearer;
     }
 
+    public static final class MeetingMappingState {
+        public String matchKey = "";
+        public String matchType = "series";
+        public String meetingTitle = "";
+        public String issueKey = "";
+        public String issueTitle = "";
+    }
+
     public static final class SettingsState {
         public List<ConnectionState> servers = new ArrayList<>();
         public String commitMessageTemplate =
                 DEFAULT_COMMIT_MESSAGE_TEMPLATE;
+        public String teamsIcsUrl = "";
+        public boolean teamsUseGraph;
+        public List<MeetingMappingState> meetingMappings = new ArrayList<>();
 
         // Legacy single-server fields for migration.
         public String url = "";
@@ -84,6 +96,11 @@ public final class JiraSettings
             snapshot.servers.add(copy(connection));
         }
         snapshot.commitMessageTemplate = state.commitMessageTemplate;
+        snapshot.teamsIcsUrl = state.teamsIcsUrl;
+        snapshot.teamsUseGraph = state.teamsUseGraph;
+        for (MeetingMappingState mapping : state.meetingMappings) {
+            snapshot.meetingMappings.add(copyMapping(mapping));
+        }
 
         return snapshot;
     }
@@ -95,10 +112,27 @@ public final class JiraSettings
                 loaded.commitMessageTemplate,
                 DEFAULT_COMMIT_MESSAGE_TEMPLATE
         );
+        replacement.teamsIcsUrl = Objects.requireNonNullElse(
+                loaded.teamsIcsUrl,
+                ""
+        );
+        replacement.teamsUseGraph = loaded.teamsUseGraph;
 
         if (loaded.servers != null) {
             for (ConnectionState connection : loaded.servers) {
                 replacement.servers.add(copy(connection));
+            }
+        }
+
+        if (loaded.meetingMappings != null) {
+            for (MeetingMappingState mapping : loaded.meetingMappings) {
+                if (mapping != null
+                        && mapping.matchKey != null
+                        && !mapping.matchKey.isBlank()
+                        && mapping.issueKey != null
+                        && !mapping.issueKey.isBlank()) {
+                    replacement.meetingMappings.add(copyMapping(mapping));
+                }
             }
         }
 
@@ -133,6 +167,24 @@ public final class JiraSettings
             List<String> enteredSecrets,
             String commitMessageTemplate
     ) {
+        save(
+                connections,
+                enteredSecrets,
+                commitMessageTemplate,
+                state.teamsIcsUrl,
+                state.teamsUseGraph,
+                ""
+        );
+    }
+
+    synchronized void save(
+            List<ConnectionState> connections,
+            List<String> enteredSecrets,
+            String commitMessageTemplate,
+            String teamsIcsUrl,
+            boolean teamsUseGraph,
+            String enteredTeamsGraphToken
+    ) {
         if (commitMessageTemplate == null
                 || commitMessageTemplate.isBlank()) {
             throw invalid("settings.commit.message.template.required");
@@ -144,8 +196,19 @@ public final class JiraSettings
             );
         }
 
+        String normalizedIcsUrl = normalizeIcsUrl(teamsIcsUrl);
+        String trimmedGraphToken = Objects.requireNonNullElse(
+                enteredTeamsGraphToken,
+                ""
+        ).trim();
+
         SettingsState replacement = new SettingsState();
         replacement.commitMessageTemplate = commitMessageTemplate;
+        replacement.teamsIcsUrl = normalizedIcsUrl;
+        replacement.teamsUseGraph = teamsUseGraph;
+        for (MeetingMappingState mapping : state.meetingMappings) {
+            replacement.meetingMappings.add(copyMapping(mapping));
+        }
         Set<String> ids = new HashSet<>();
 
         for (ConnectionState connection : connections) {
@@ -221,6 +284,25 @@ public final class JiraSettings
             }
         }
 
+        if (teamsUseGraph) {
+            if (!trimmedGraphToken.isEmpty()) {
+                changes.put(
+                        teamsGraphAttributes(),
+                        new Credentials("teams-graph", trimmedGraphToken)
+                );
+            } else {
+                String savedToken = store.getPassword(teamsGraphAttributes());
+                if (savedToken == null || savedToken.isEmpty()) {
+                    throw invalid("settings.teams.token.required");
+                }
+            }
+        } else if (!trimmedGraphToken.isEmpty()) {
+            changes.put(
+                    teamsGraphAttributes(),
+                    new Credentials("teams-graph", trimmedGraphToken)
+            );
+        }
+
         Map<CredentialAttributes, Credentials> previousCredentials =
                 new LinkedHashMap<>();
 
@@ -252,6 +334,106 @@ public final class JiraSettings
         }
 
         state = replacement;
+    }
+
+    synchronized void saveTeamsConfig(
+            String teamsIcsUrl,
+            boolean teamsUseGraph,
+            String enteredTeamsGraphToken
+    ) {
+        String normalizedIcsUrl = normalizeIcsUrl(teamsIcsUrl);
+        String trimmedToken = Objects.requireNonNullElse(
+                enteredTeamsGraphToken,
+                ""
+        ).trim();
+        CredentialStore store = credentialStore.get();
+        CredentialAttributes key = teamsGraphAttributes();
+
+        if (teamsUseGraph) {
+            if (!trimmedToken.isEmpty()) {
+                store.set(key, new Credentials("teams-graph", trimmedToken));
+            } else {
+                String saved = store.getPassword(key);
+                if (saved == null || saved.isEmpty()) {
+                    throw invalid("settings.teams.token.required");
+                }
+            }
+        } else if (!trimmedToken.isEmpty()) {
+            store.set(key, new Credentials("teams-graph", trimmedToken));
+        }
+
+        state.teamsIcsUrl = normalizedIcsUrl;
+        state.teamsUseGraph = teamsUseGraph;
+    }
+
+    synchronized void saveMeetingMapping(
+            String matchKey,
+            String matchType,
+            String meetingTitle,
+            String issueKey,
+            String issueTitle
+    ) {
+        String normalizedKey = Objects.requireNonNullElse(matchKey, "").trim();
+        String normalizedType = "instance".equals(matchType) ? "instance" : "series";
+        String normalizedIssue = Objects.requireNonNullElse(issueKey, "").trim();
+
+        if (normalizedKey.isEmpty()) {
+            throw invalid("request.invalid");
+        }
+
+        state.meetingMappings.removeIf(existing ->
+                existing.matchKey.equalsIgnoreCase(normalizedKey)
+                        && existing.matchType.equals(normalizedType)
+        );
+
+        if (!normalizedIssue.isEmpty()) {
+            MeetingMappingState added = new MeetingMappingState();
+            added.matchKey = normalizedKey;
+            added.matchType = normalizedType;
+            added.meetingTitle = Objects.requireNonNullElse(meetingTitle, "").trim();
+            added.issueKey = normalizedIssue;
+            added.issueTitle = Objects.requireNonNullElse(issueTitle, "").trim();
+            state.meetingMappings.add(added);
+        }
+    }
+
+    boolean hasTeamsGraphToken() {
+        String saved = credentialStore.get().getPassword(teamsGraphAttributes());
+        return saved != null && !saved.isEmpty();
+    }
+
+    String teamsGraphToken() {
+        String saved = credentialStore.get().getPassword(teamsGraphAttributes());
+        if (saved == null || saved.isEmpty()) {
+            throw invalid("settings.teams.token.required");
+        }
+        return saved;
+    }
+
+    static String normalizeIcsUrl(String rawUrl) {
+        String trimmed = Objects.requireNonNullElse(rawUrl, "").trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        if (trimmed.regionMatches(true, 0, "webcals://", 0, 10)) {
+            trimmed = "https://" + trimmed.substring(10);
+        } else if (trimmed.regionMatches(true, 0, "webcal://", 0, 9)) {
+            trimmed = "https://" + trimmed.substring(9);
+        }
+        try {
+            URI uri = URI.create(trimmed);
+            String scheme = uri.getScheme();
+            if (scheme == null
+                    || (!scheme.equalsIgnoreCase("http")
+                    && !scheme.equalsIgnoreCase("https"))
+                    || uri.getHost() == null
+                    || uri.getHost().isBlank()) {
+                throw invalid("settings.teams.ics.invalid");
+            }
+            return uri.toString();
+        } catch (IllegalArgumentException exception) {
+            throw invalid("settings.teams.ics.invalid");
+        }
     }
 
     String secret(ConnectionState selected) {
@@ -289,6 +471,16 @@ public final class JiraSettings
         return result;
     }
 
+    static MeetingMappingState copyMapping(MeetingMappingState original) {
+        MeetingMappingState result = new MeetingMappingState();
+        result.matchKey = Objects.requireNonNullElse(original.matchKey, "");
+        result.matchType = Objects.requireNonNullElse(original.matchType, "series");
+        result.meetingTitle = Objects.requireNonNullElse(original.meetingTitle, "");
+        result.issueKey = Objects.requireNonNullElse(original.issueKey, "");
+        result.issueTitle = Objects.requireNonNullElse(original.issueTitle, "");
+        return result;
+    }
+
     private static boolean sameIdentity(
             ConnectionState first,
             ConnectionState second
@@ -307,6 +499,13 @@ public final class JiraSettings
                         + ":"
                         + connection.bearer,
                 connection.username
+        );
+    }
+
+    private static CredentialAttributes teamsGraphAttributes() {
+        return new CredentialAttributes(
+                "Jira Issue Tracker:TeamsGraph",
+                "teams-graph"
         );
     }
 

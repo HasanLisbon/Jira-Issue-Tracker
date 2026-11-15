@@ -4,8 +4,8 @@
     <vendor>Jira Issue Tracker</vendor>
     <description>Browse Jira issues, track and log work, change status, and discuss issues using an independent Jira connection.</description>
     <depends>com.intellij.modules.platform</depends>
+    <depends optional="true" config-file="jcef.xml">com.intellij.modules.jcef</depends>
     <depends>Git4Idea</depends>
-
 
     <extensions defaultExtensionNs="com.intellij">
         <applicationService serviceImplementation="dev.jiraissuetracker.intellij.JiraSettings"/>

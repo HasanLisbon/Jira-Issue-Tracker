@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "dev.jiraissuetracker"
-version = "0.1.0"
+version = "0.1.2"
 
 repositories {
     mavenCentral()
@@ -28,6 +28,18 @@ dependencies {
             local(localPlatformPath.get())
         } else {
             intellijIdea(providers.gradleProperty("platformVersion"))
+        }
+        val platformVer = providers.gradleProperty("platformVersion").orNull ?: ""
+        val isLegacyMonolithPlatform = platformVer.startsWith("2022") ||
+            platformVer.startsWith("2023") ||
+            platformVer.startsWith("2024") ||
+            platformVer.startsWith("22") ||
+            platformVer.startsWith("23") ||
+            platformVer.startsWith("24")
+        if (!isLegacyMonolithPlatform) {
+            bundledPlugin("com.intellij.modules.jcef")
+            bundledModule("intellij.platform.vcs.dvcs")
+            bundledModule("intellij.platform.vcs.dvcs.impl")
         }
         bundledPlugin("Git4Idea")
     }
@@ -86,6 +98,7 @@ intellijPlatform {
     pluginConfiguration {
         ideaVersion {
             sinceBuild = "242"
+            untilBuild = provider { null }
         }
     }
 }

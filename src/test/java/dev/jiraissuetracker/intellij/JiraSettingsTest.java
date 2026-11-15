@@ -263,6 +263,46 @@ public class JiraSettingsTest {
                 persistence.storages()[0].value());
     }
 
+    @Test
+    public void when_teamsConfigAndMeetingMappingsAreSaved_then_getState_should_PersistMappingsAndKeepGraphTokenInCredentialStore() {
+        Map<CredentialAttributes, Credentials> secrets = new HashMap<>();
+        JiraSettings settings = settings(secrets);
+
+        settings.saveTeamsConfig(
+                "webcal://outlook.office365.com/owa/calendar/team.ics",
+                true,
+                "secret-graph-token"
+        );
+        settings.saveMeetingMapping(
+                "daily standup",
+                "series",
+                "Daily Standup",
+                "PROJ-10",
+                "Ceremonies"
+        );
+
+        Element serialized = XmlSerializer.serialize(settings.getState());
+        String xml = new XMLOutputter().outputString(serialized);
+        assertFalse(xml.contains("secret-graph-token"));
+        assertTrue(xml.contains("https://outlook.office365.com/owa/calendar/team.ics"));
+        assertTrue(xml.contains("PROJ-10"));
+
+        JiraSettings reloaded = settings(secrets);
+        reloaded.loadState(XmlSerializer.deserialize(
+                serialized, JiraSettings.SettingsState.class));
+        assertEquals(
+                "https://outlook.office365.com/owa/calendar/team.ics",
+                reloaded.getState().teamsIcsUrl
+        );
+        assertTrue(reloaded.getState().teamsUseGraph);
+        assertEquals("secret-graph-token", reloaded.teamsGraphToken());
+        assertEquals(1, reloaded.getState().meetingMappings.size());
+        assertEquals("PROJ-10", reloaded.getState().meetingMappings.get(0).issueKey);
+
+        reloaded.saveMeetingMapping("daily standup", "series", "Daily Standup", "", "");
+        assertTrue(reloaded.getState().meetingMappings.isEmpty());
+    }
+
     private static JiraSettings.ConnectionState configured(
             String name,
             String url,

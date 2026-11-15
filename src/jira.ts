@@ -1,4 +1,4 @@
-import type { JiraIssue, Subtask } from './types.ts';
+import type { JiraIssue, Subtask, TeamsMeeting, MeetingTicketMapping } from './types.ts';
 
 export interface JiraConnection {
   id: string;
@@ -147,4 +147,66 @@ export function worklogStarted(input: string): string {
   const hours = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
   const minutes = String(Math.abs(offset) % 60).padStart(2, '0');
   return `${input}:00${offset < 0 ? '-' : '+'}${hours}:${minutes}`;
+}
+
+export interface ResolvedMeetingTicket {
+  issueKey: string;
+  issueTitle: string;
+  source: 'instance' | 'series' | 'auto';
+  matchKey: string;
+  matchType: 'instance' | 'series';
+}
+
+export function resolveMeetingTicket(
+  meeting: Pick<TeamsMeeting, 'id' | 'seriesKey' | 'title'>,
+  mappings: MeetingTicketMapping[],
+  issues: Array<Pick<JiraIssue, 'key' | 'title'>> = [],
+): ResolvedMeetingTicket | null {
+  const findTitle = (key: string, fallback = '') =>
+    issues.find((item) => item.key.toUpperCase() === key.toUpperCase())?.title || fallback;
+
+  const instanceMatch = mappings.find(
+    (m) => m.matchType === 'instance' && m.matchKey.toLowerCase() === meeting.id.toLowerCase(),
+  );
+  if (instanceMatch && instanceMatch.issueKey) {
+    return {
+      issueKey: instanceMatch.issueKey,
+      issueTitle: findTitle(instanceMatch.issueKey, instanceMatch.issueTitle),
+      source: 'instance',
+      matchKey: instanceMatch.matchKey,
+      matchType: 'instance',
+    };
+  }
+
+  const normalizedTitle = meeting.title.trim().replace(/\s+/g, ' ').toLowerCase();
+  const seriesKey = (meeting.seriesKey || normalizedTitle).toLowerCase();
+  const seriesMatch = mappings.find(
+    (m) =>
+      m.matchType === 'series' &&
+      (m.matchKey.toLowerCase() === seriesKey ||
+        (m.meetingTitle && m.meetingTitle.trim().replace(/\s+/g, ' ').toLowerCase() === normalizedTitle)),
+  );
+  if (seriesMatch && seriesMatch.issueKey) {
+    return {
+      issueKey: seriesMatch.issueKey,
+      issueTitle: findTitle(seriesMatch.issueKey, seriesMatch.issueTitle),
+      source: 'series',
+      matchKey: seriesMatch.matchKey,
+      matchType: 'series',
+    };
+  }
+
+  const keyInTitle = meeting.title.match(/\b([A-Z][A-Z0-9_]+-\d+)\b/);
+  if (keyInTitle) {
+    const autoKey = keyInTitle[1];
+    return {
+      issueKey: autoKey,
+      issueTitle: findTitle(autoKey, ''),
+      source: 'auto',
+      matchKey: meeting.seriesKey || normalizedTitle,
+      matchType: 'series',
+    };
+  }
+
+  return null;
 }
