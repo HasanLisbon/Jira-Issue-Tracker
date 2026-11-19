@@ -418,9 +418,9 @@ try {
   await command('Page.enable');
   await command('Runtime.enable');
   await command('Emulation.setDeviceMetricsOverride', {
-    width: 560,
-    height: 880,
-    deviceScaleFactor: 2,
+    width: 1200,
+    height: 760,
+    deviceScaleFactor: 1,
     mobile: false,
   });
 
