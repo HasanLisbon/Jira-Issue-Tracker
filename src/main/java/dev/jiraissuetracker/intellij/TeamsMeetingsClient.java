@@ -589,6 +589,7 @@ final class TeamsMeetingsClient {
                     Map.entry("UTC", "UTC"),
                     Map.entry("W. Europe Standard Time", "Europe/Berlin"),
                     Map.entry("Central Europe Standard Time", "Europe/Budapest"),
+                    Map.entry("Central European Standard Time", "Europe/Warsaw"),
                     Map.entry("Romance Standard Time", "Europe/Paris"),
                     Map.entry("GMT Standard Time", "Europe/London"),
                     Map.entry("FLE Standard Time", "Europe/Kiev"),

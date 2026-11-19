@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, RotateCcw, Send, History } from 'lucide-react';
 import type { ActiveTimer, JiraIssue, MeetingTimerPause } from './types.ts';
-import { cestInput, worklogStarted, jiraRequest } from './jira.ts';
+import { cestInput, formatLocalDateTime, worklogStarted, jiraRequest } from './jira.ts';
 import type { JiraWorklog } from './jira.ts';
 import { messages } from './messages.ts';
 
@@ -16,13 +16,14 @@ interface TrackerTabProps {
   repositoryId: string;
   revision: number;
   writing: boolean;
+  systemTimeZone?: string;
 }
 
 export const TrackerTab: React.FC<TrackerTabProps> = (props) => {
-  const { activeTimer } = props;
+  const { activeTimer, systemTimeZone } = props;
   const [workComment, setWorkComment] = useState('');
   const [customTime, setCustomTime] = useState('');
-  const [started, setStarted] = useState(() => cestInput(activeTimer.startedAt || new Date()));
+  const [started, setStarted] = useState(() => cestInput(activeTimer.startedAt || new Date(), systemTimeZone));
   const [worklogs, setWorklogs] = useState<JiraWorklog[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,8 +31,8 @@ export const TrackerTab: React.FC<TrackerTabProps> = (props) => {
   const pending = useRef(false);
 
   useEffect(() => {
-    setStarted(cestInput(activeTimer.startedAt || new Date()));
-  }, [activeTimer.issueKey, activeTimer.startedAt]);
+    setStarted(cestInput(activeTimer.startedAt || new Date(), systemTimeZone));
+  }, [activeTimer.issueKey, activeTimer.startedAt, systemTimeZone]);
 
   useEffect(() => {
     let current = true;
@@ -59,7 +60,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = (props) => {
     setSubmitting(true);
     setError('');
     try {
-      await props.onLogWork(activeTimer.issueKey, duration, workComment, worklogStarted(started));
+      await props.onLogWork(activeTimer.issueKey, duration, workComment, worklogStarted(started, systemTimeZone));
       setCustomTime('');
       setWorkComment('');
     } catch (failure) {
@@ -132,7 +133,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = (props) => {
         {!loading && !worklogs.length && <p className="text-[#7D8395]">{messages['work.empty']}</p>}
         {worklogs.map((log) => <div key={log.id} className="p-2 rounded bg-[#1C1E26] border border-[#2B2E3C] text-[11px]">
           <div className="flex justify-between gap-2"><span>{log.author.displayName}</span><span className="text-[#34C759] font-mono">{log.timeSpent}</span></div>
-          <div className="text-[#7D8395]">{new Date(log.started).toLocaleString('sv-SE')}</div>
+          <div className="text-[#7D8395]">{formatLocalDateTime(log.started, systemTimeZone)}</div>
           <p className="whitespace-pre-wrap select-text">{log.comment}</p>
         </div>)}
       </div>

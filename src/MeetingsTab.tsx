@@ -12,6 +12,7 @@ interface MeetingsTabProps {
   onLogWork: (key: string, duration: string, comment: string, started: string) => Promise<void>;
   onOpenIssue: (key: string) => void;
   writing: boolean;
+  systemTimeZone?: string;
 }
 
 export const MeetingsTab: React.FC<MeetingsTabProps> = (props) => {
@@ -143,8 +144,8 @@ export const MeetingsTab: React.FC<MeetingsTabProps> = (props) => {
     setError('');
     setNotice('');
     try {
-      const startInput = cestInput(new Date(meeting.start));
-      const startedIso = worklogStarted(startInput);
+      const startInput = cestInput(new Date(meeting.start), props.systemTimeZone);
+      const startedIso = worklogStarted(startInput, props.systemTimeZone);
       await props.onLogWork(issueKey, meeting.durationFormatted, `Teams meeting: ${meeting.title}`, startedIso);
       setNotice(messages.saved);
     } catch (failure) {
@@ -157,9 +158,10 @@ export const MeetingsTab: React.FC<MeetingsTabProps> = (props) => {
   const formatMeetingTime = (startIso: string, endIso: string) => {
     const start = new Date(startIso);
     const end = new Date(endIso);
-    const datePart = start.toLocaleDateString('sv-SE', { weekday: 'short', month: 'short', day: 'numeric' });
-    const startClock = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    const endClock = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    const tzOption = props.systemTimeZone ? { timeZone: props.systemTimeZone } : {};
+    const datePart = start.toLocaleDateString('sv-SE', { weekday: 'short', month: 'short', day: 'numeric', ...tzOption });
+    const startClock = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, ...tzOption });
+    const endClock = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, ...tzOption });
     return `${datePart} • ${startClock}–${endClock}`;
   };
 

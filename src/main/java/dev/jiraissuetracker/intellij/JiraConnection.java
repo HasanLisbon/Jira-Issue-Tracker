@@ -11,6 +11,7 @@ import com.intellij.util.net.ssl.CertificateManager;
 import java.net.ProxySelector;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.ResourceBundle;
 
@@ -79,6 +80,10 @@ final class JiraConnection {
                 connection.addProperty(
                         "commitMessageTemplate",
                         settingsState.commitMessageTemplate
+                );
+                connection.addProperty(
+                        "systemTimeZone",
+                        ZoneId.systemDefault().getId()
                 );
                 connections.add(connection);
             }

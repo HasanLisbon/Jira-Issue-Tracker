@@ -365,37 +365,40 @@ export default function App() {
         {activeTab === 'details' && (selectedIssue ? <DetailsTab key={`${connectionId}:${selectedIssue.id}`} issue={selectedIssue}
           onBackToIssues={() => setActiveTab('issues')} onStartTracking={requestTracking}
           repositoryId={connectionId} revision={revision} writing={interactionPending} onMutate={mutate}
-          commitMessageTemplate={connection?.commitMessageTemplate ?? ''} />
-          : <div className="p-4 text-[#7D8395]">{messages['no.issue']}</div>)}
-          {activeTab === 'tracker' && <TrackerTab activeTimer={activeTimer} pausedByMeeting={pausedByMeeting} issues={issues} repositoryId={connectionId}
-            revision={revision} writing={interactionPending} onSelectIssue={(issue) => { void requestTracking(issue); }}
-            onToggleTimer={() => {
-              if (interactionPending || !activeTimer.issueKey) return;
-              if (activeTimer.isRunning) {
-                setPausedByMeeting(null);
-                setActiveTimer((timer) => ({ ...timer, isRunning: false }));
-              } else {
-                void requestTracking({ key: activeTimer.issueKey, title: activeTimer.issueTitle });
-              }
-            }}
-            onResetTimer={() => {
-              if (!interactionPending) {
-                setPausedByMeeting(null);
-                setActiveTimer((timer) => ({ ...timer, seconds: 0, isRunning: false, startedAt: undefined }));
-              }
-            }}
-            onLogWork={async (key, duration, body, started) => {
+          commitMessageTemplate={connection?.commitMessageTemplate ?? ''}
+        systemTimeZone={connection?.systemTimeZone} />
+        : <div className="p-4 text-[#7D8395]">{messages['no.issue']}</div>)}
+        {activeTab === 'tracker' && <TrackerTab activeTimer={activeTimer} pausedByMeeting={pausedByMeeting} issues={issues} repositoryId={connectionId}
+          revision={revision} writing={interactionPending} systemTimeZone={connection?.systemTimeZone}
+          onSelectIssue={(issue) => { void requestTracking(issue); }}
+          onToggleTimer={() => {
+            if (interactionPending || !activeTimer.issueKey) return;
+            if (activeTimer.isRunning) {
               setPausedByMeeting(null);
               setActiveTimer((timer) => ({ ...timer, isRunning: false }));
-              await mutate('worklog', { key, duration, body, started });
+            } else {
+              void requestTracking({ key: activeTimer.issueKey, title: activeTimer.issueTitle });
+            }
+          }}
+          onResetTimer={() => {
+            if (!interactionPending) {
+              setPausedByMeeting(null);
               setActiveTimer((timer) => ({ ...timer, seconds: 0, isRunning: false, startedAt: undefined }));
-            }} />}
-            {activeTab === 'meetings' && <MeetingsTab issues={issues} initialMeetings={meetings} onMeetingsChange={setMeetings} writing={interactionPending}
-              onStartTracking={(issue, event) => { void requestTracking(issue, event); }}
-              onOpenIssue={(key) => { void openIssue(key); }}
-              onLogWork={async (key, duration, body, started) => {
-                await mutate('worklog', { key, duration, body, started });
-              }} />}
+            }
+          }}
+          onLogWork={async (key, duration, body, started) => {
+            setPausedByMeeting(null);
+            setActiveTimer((timer) => ({ ...timer, isRunning: false }));
+            await mutate('worklog', { key, duration, body, started });
+            setActiveTimer((timer) => ({ ...timer, seconds: 0, isRunning: false, startedAt: undefined }));
+          }} />}
+        {activeTab === 'meetings' && <MeetingsTab issues={issues} initialMeetings={meetings} onMeetingsChange={setMeetings} writing={interactionPending}
+          systemTimeZone={connection?.systemTimeZone}
+          onStartTracking={(issue, event) => { void requestTracking(issue, event); }}
+          onOpenIssue={(key) => { void openIssue(key); }}
+          onLogWork={async (key, duration, body, started) => {
+            await mutate('worklog', { key, duration, body, started });
+          }} />}
       </div>
       {branchFlow && <BranchDialog plan={branchFlow.plan} busy={branchBusy} error={branchError}
         onConfirm={(root, name, base) => { void confirmBranch(root, name, base); }}

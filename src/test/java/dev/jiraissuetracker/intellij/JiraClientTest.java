@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.Test;
 
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -57,6 +58,26 @@ public class JiraClientTest {
             request.addProperty("started", "2026-10-29T09:30:00" + offset);
             assertEquals("123", client.execute(request).getAsJsonObject().get("id").getAsString());
         }
+    }
+
+    @Test
+    public void when_worklogHasBareLocalTime_then_execute_should_ResolveUsingSystemZone() throws Exception {
+        ZoneId stockholm = ZoneId.of("Europe/Stockholm");
+        JiraClient winterClient = new JiraClient((method, path, body) -> {
+            assertEquals("2026-11-19T14:30:00.000+0100", body.get("started").getAsString());
+            return "{\"id\":\"124\"}";
+        }, stockholm);
+        assertEquals("124", winterClient.execute(request(
+                "{\"operation\":\"worklog\",\"key\":\"TEST-1\",\"duration\":\"30m\",\"started\":\"2026-11-19T14:30\"}"
+        )).getAsJsonObject().get("id").getAsString());
+
+        JiraClient summerClient = new JiraClient((method, path, body) -> {
+            assertEquals("2026-07-24T14:30:00.000+0200", body.get("started").getAsString());
+            return "{\"id\":\"125\"}";
+        }, stockholm);
+        assertEquals("125", summerClient.execute(request(
+                "{\"operation\":\"worklog\",\"key\":\"TEST-1\",\"duration\":\"30m\",\"started\":\"2026-07-24T14:30\"}"
+        )).getAsJsonObject().get("id").getAsString());
     }
 
     @Test

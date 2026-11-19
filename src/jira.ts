@@ -6,6 +6,7 @@ export interface JiraConnection {
   url: string;
   query: string;
   commitMessageTemplate: string;
+  systemTimeZone?: string;
 }
 
 export interface JiraUser {
@@ -136,11 +137,91 @@ export function mapIssue(issue: RawIssue, currentUser?: JiraUser): JiraIssue {
   };
 }
 
-export function cestInput(date: Date): string {
+function zonedDateTimeParts(epochMs: number, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(epochMs));
+  const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 'NaN');
+  return {
+    year: value('year'),
+    month: value('month'),
+    day: value('day'),
+    hour: value('hour'),
+    minute: value('minute'),
+  };
+}
+
+function partsToUtcMs(parts: { year: number; month: number; day: number; hour: number; minute: number }): number {
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+}
+
+export function formatLocalDateTime(value: string | Date, timeZone?: string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  try {
+    return date.toLocaleString('sv-SE', timeZone ? { timeZone } : undefined);
+  } catch {
+    return date.toLocaleString('sv-SE');
+  }
+}
+
+export function cestInput(date: Date, timeZone?: string): string {
+  if (!Number.isFinite(date.getTime())) return '';
+  if (timeZone) {
+    try {
+      const parts = zonedDateTimeParts(date.getTime(), timeZone);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}`;
+    } catch {
+      // Fall back to runtime local timezone if the supplied timeZone is invalid
+    }
+  }
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
-export function worklogStarted(input: string): string {
+export function worklogStarted(input: string, timeZone?: string): string {
+  if (timeZone) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(input);
+    if (!match) throw new Error('started.invalid');
+    const target = {
+      year: Number(match[1]),
+      month: Number(match[2]),
+      day: Number(match[3]),
+      hour: Number(match[4]),
+      minute: Number(match[5]),
+    };
+    const utcGuess = partsToUtcMs(target);
+    const matchesTarget = (parts: typeof target) =>
+      parts.year === target.year
+      && parts.month === target.month
+      && parts.day === target.day
+      && parts.hour === target.hour
+      && parts.minute === target.minute;
+
+    try {
+      const firstParts = zonedDateTimeParts(utcGuess, timeZone);
+      let candidate = utcGuess - (partsToUtcMs(firstParts) - utcGuess);
+      let actual = zonedDateTimeParts(candidate, timeZone);
+      if (!matchesTarget(actual)) {
+        candidate = utcGuess - (partsToUtcMs(actual) - candidate);
+        actual = zonedDateTimeParts(candidate, timeZone);
+      }
+      if (!matchesTarget(actual)) throw new Error('started.invalid');
+      const offset = Math.round((utcGuess - candidate) / 60000);
+      const hours = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
+      const minutes = String(Math.abs(offset) % 60).padStart(2, '0');
+      return `${input}:00${offset < 0 ? '-' : '+'}${hours}:${minutes}`;
+    } catch (failure) {
+      if (failure instanceof Error && failure.message === 'started.invalid') throw failure;
+      // Fall back to runtime local timezone if timeZone is unrecognized
+    }
+  }
   const date = new Date(input);
   if (!Number.isFinite(date.getTime()) || cestInput(date) !== input) throw new Error('started.invalid');
   const offset = -date.getTimezoneOffset();

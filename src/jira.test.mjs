@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { tsImport } from 'tsx/esm/api';
 
-const { mapIssue, cestInput, worklogStarted, jiraRequest, formatCommitMessage, resolveMeetingTicket, evaluateMeetingTimerCollision } = await tsImport('./jira.ts', import.meta.url);
+const { mapIssue, cestInput, formatLocalDateTime, worklogStarted, jiraRequest, formatCommitMessage, resolveMeetingTicket, evaluateMeetingTimerCollision } = await tsImport('./jira.ts', import.meta.url);
 const { prepareTracking, branchNames, repositoryKey, belongsToRepository } = await tsImport('./branches.ts', import.meta.url);
 
 test('normalizes web, https and ssh repository URLs to the same key', () => {
@@ -158,6 +158,15 @@ test('formats and submits worklogs using the system timezone at the entered date
     for (const input of ['', 'invalid', '2026-02-30T09:30', '2026-03-29T02:30']) {
       assert.throws(() => worklogStarted(input));
     }
+
+    // Even if JCEF/browser runtime defaults to UTC, explicit systemTimeZone resolves Sweden winter (+01:00) & summer (+02:00)
+    process.env.TZ = 'UTC';
+    assert.equal(cestInput(new Date('2026-11-19T13:30:00Z'), 'Europe/Stockholm'), '2026-11-19T14:30');
+    assert.equal(worklogStarted('2026-11-19T14:30', 'Europe/Stockholm'), '2026-11-19T14:30:00+01:00');
+    assert.equal(cestInput(new Date('2026-07-24T07:30:00Z'), 'Europe/Stockholm'), '2026-07-24T09:30');
+    assert.equal(worklogStarted('2026-07-24T09:30', 'Europe/Stockholm'), '2026-07-24T09:30:00+02:00');
+    assert.equal(formatLocalDateTime('2026-11-19T13:30:00Z', 'Europe/Stockholm'), '2026-11-19 14:30:00');
+    assert.throws(() => worklogStarted('2026-03-29T02:30', 'Europe/Stockholm'));
   } finally {
     if (originalTimezone === undefined) delete process.env.TZ;
     else process.env.TZ = originalTimezone;

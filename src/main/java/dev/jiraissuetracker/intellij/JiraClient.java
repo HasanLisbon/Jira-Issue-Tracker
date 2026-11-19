@@ -7,7 +7,9 @@ import com.google.gson.JsonParser;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.ResourceBundle;
@@ -19,13 +21,19 @@ final class JiraClient {
     private static final Pattern KEY = Pattern.compile("[A-Z][A-Z0-9_]*-[0-9]+");
     private static final Pattern DURATION = Pattern.compile("(?:(\\d+)h)?\\s*(?:(\\d+)m)?");
     private final Transport transport;
+    private final ZoneId systemZone;
 
     interface Transport {
         String request(String method, String path, JsonObject body) throws Exception;
     }
 
     JiraClient(Transport transport) {
+        this(transport, ZoneId.systemDefault());
+    }
+
+    JiraClient(Transport transport, ZoneId systemZone) {
         this.transport = transport;
+        this.systemZone = systemZone;
     }
 
     JsonElement execute(JsonObject request) throws Exception {
@@ -150,7 +158,10 @@ final class JiraClient {
         if (seconds <= 0 || seconds > Integer.MAX_VALUE) {
             throw invalid("duration.invalid");
         }
-        OffsetDateTime started = OffsetDateTime.parse(required(request, "started"));
+        String rawStarted = required(request, "started");
+        OffsetDateTime started = (rawStarted.endsWith("Z") || rawStarted.matches(".*[+-]\\d{2}:?\\d{2}$"))
+                ? OffsetDateTime.parse(rawStarted)
+                : LocalDateTime.parse(rawStarted).atZone(systemZone).toOffsetDateTime();
         JsonObject body = new JsonObject();
         body.addProperty("timeSpentSeconds", seconds);
         body.addProperty("started", started.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSxx")));

@@ -18,13 +18,14 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { JiraIssue } from './types.ts';
-import { formatCommitMessage, jiraRequest, initials } from './jira.ts';
+import { formatCommitMessage, formatLocalDateTime, jiraRequest, initials } from './jira.ts';
 import type { JiraComment, JiraTransition } from './jira.ts';
 import { messages } from './messages.ts';
 
 interface DetailsTabProps {
   issue: JiraIssue;
   commitMessageTemplate: string;
+  systemTimeZone?: string;
   onBackToIssues: () => void;
   onStartTracking: (issue: JiraIssue) => void;
   repositoryId: string;
@@ -36,6 +37,7 @@ interface DetailsTabProps {
 export const DetailsTab: React.FC<DetailsTabProps> = ({
   issue,
   commitMessageTemplate,
+  systemTimeZone,
   onBackToIssues,
   onStartTracking,
   repositoryId,
@@ -318,7 +320,7 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({
                     </span>
                     <span>{comment.author.displayName}</span>
                   </div>
-                  <span className="font-mono">{new Date(comment.created).toLocaleString('sv-SE', { timeZone: 'Etc/GMT-2' })}</span>
+                  <span className="font-mono">{formatLocalDateTime(comment.created, systemTimeZone)}</span>
                 </div>
                 <div className="text-[#C5CAD4] leading-relaxed whitespace-pre-wrap select-text">{comment.body}</div>
                 <button disabled={writing || loading} onClick={() => setReplyTo(comment)} className="mt-2 text-[#5384F7]">{messages.reply}</button>

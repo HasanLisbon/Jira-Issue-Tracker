@@ -1,10 +1,10 @@
 <idea-plugin>
-    <id>dev.jiraissuetracker</id>
-    <name>Jira Issue Tracker</name>
-    <vendor url="https://github.com/HasanLisbon/Jira-Issue-Tracker">Jira Issue Tracker</vendor>
+    <id>dev.hasanlisbon.jiraflow</id>
+    <name>Jira Flow - Issues, Git Branches &amp; Time Tracker</name>
+    <vendor url="https://github.com/HasanLisbon/Jira-Issue-Tracker">HasanLisbon</vendor>
     <description><![CDATA[
 <p>
-  <strong>Jira Issue Tracker</strong> is an integrated IntelliJ IDEA tool window for browsing Jira Server &amp; Data Center issues, automating Git task branch workflows, tracking time with meeting-aware timers, and syncing upcoming Microsoft Teams / Outlook meetings directly inside your IDE.
+  <strong>Jira Flow - Issues, Git Branches &amp; Time Tracker</strong> is an integrated IntelliJ IDEA tool window for browsing Jira Server &amp; Data Center issues, automating Git task branch workflows, tracking time with meeting-aware timers, and syncing upcoming Microsoft Teams / Outlook meetings directly inside your IDE.
 </p>
 
 <h2>Key Features</h2>
