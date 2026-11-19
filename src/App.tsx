@@ -9,10 +9,11 @@ import { IssuesScreen } from './IssuesScreen.tsx';
 import { DetailsTab } from './DetailsTab.tsx';
 import { TrackerTab } from './TrackerTab.tsx';
 import { MeetingsTab } from './MeetingsTab.tsx';
+import { StagedWorklogsTab } from './StagedWorklogsTab.tsx';
 import { SettingsModal } from './SettingsModal.tsx';
-import { jiraRequest, mapIssue, evaluateMeetingTimerCollision, findCollidingMeetings } from './jira.ts';
+import { jiraRequest, mapIssue, formatDuration, evaluateMeetingTimerCollision, findCollidingMeetings } from './jira.ts';
 import type { JiraConnection, JiraUser, RawIssue } from './jira.ts';
-import type { ActiveTab, ActiveTimer, JiraIssue, Subtask, FilterKey, TeamsMeeting, TeamsMeetingsResponse, MeetingTimerPause } from './types.ts';
+import type { ActiveTab, ActiveTimer, JiraIssue, Subtask, FilterKey, TeamsMeeting, TeamsMeetingsResponse, MeetingTimerPause, StagedWorklog } from './types.ts';
 import { messages } from './messages.ts';
 import { prepareTracking, branchNames, belongsToRepository, lookupBranches } from './branches.ts';
 import type { BranchPlan, DevBranch, TaskBranches } from './branches.ts';
@@ -35,6 +36,7 @@ export default function App() {
   const [revision, setRevision] = useState(0);
   const [activeTimer, setActiveTimer] = useState<ActiveTimer>({ issueKey: '', issueTitle: '', seconds: 0, isRunning: false });
   const [meetings, setMeetings] = useState<TeamsMeeting[]>([]);
+  const [stagedWorklogs, setStagedWorklogs] = useState<StagedWorklog[]>([]);
   const [pausedByMeeting, setPausedByMeeting] = useState<MeetingTimerPause | null>(null);
   const dismissedMeetings = useRef<Set<string>>(new Set());
   const generation = useRef(0);
@@ -108,6 +110,43 @@ export default function App() {
     } finally {
       if (generation.current === requestGeneration) setIsRefreshing(false);
     }
+  }
+
+  useEffect(() => {
+    if (!connectionId) {
+      setStagedWorklogs([]);
+      return;
+    }
+    try {
+      const saved = window.localStorage.getItem(`jira-staged-worklogs:${connectionId}`);
+      const parsed = saved ? JSON.parse(saved) : [];
+      setStagedWorklogs(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setStagedWorklogs([]);
+    }
+  }, [connectionId]);
+
+  useEffect(() => {
+    if (!connectionId) return;
+    try {
+      window.localStorage.setItem(`jira-staged-worklogs:${connectionId}`, JSON.stringify(stagedWorklogs));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [connectionId, stagedWorklogs]);
+
+  function stageWorklog(entry: Omit<StagedWorklog, 'id'>) {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setStagedWorklogs((previous) => [...previous, { ...entry, id }]);
+    setNotice(`${messages['staged.added']} (${entry.issueKey} • ${formatDuration(entry.minutes)})`);
+  }
+
+  function updateStagedWorklog(id: string, patch: Partial<Pick<StagedWorklog, 'minutes' | 'started' | 'comment'>>) {
+    setStagedWorklogs((previous) => previous.map((item) => item.id === id ? { ...item, ...patch } : item));
+  }
+
+  function removeStagedWorklog(id: string) {
+    setStagedWorklogs((previous) => previous.filter((item) => item.id !== id));
   }
 
   useEffect(() => {
@@ -337,7 +376,7 @@ export default function App() {
       <TopBar activeTab={activeTab} onTabChange={setActiveTab} onRefresh={refresh}
         isRefreshing={isRefreshing} onOpenSettings={() => setSettingsOpen(true)}
         connections={connections} connectionId={connectionId} onSelectConnection={selectConnection}
-        hasActiveTimer={activeTimer.isRunning} user={user?.displayName || ''} disabled={interactionPending || isRefreshing} />
+        hasActiveTimer={activeTimer.isRunning} stagedCount={stagedWorklogs.length} user={user?.displayName || ''} disabled={interactionPending || isRefreshing} />
       {error && <div role="alert" className="p-3 text-[#FF5C5C] border-b border-[#2E3240]">{error}</div>}
       {notice && <div role="status" className="p-2 text-[#34C759] border-b border-[#2E3240]">{notice}</div>}
       {pausedByMeeting && !activeTimer.isRunning && (
@@ -369,7 +408,7 @@ export default function App() {
         systemTimeZone={connection?.systemTimeZone} />
         : <div className="p-4 text-[#7D8395]">{messages['no.issue']}</div>)}
         {activeTab === 'tracker' && <TrackerTab activeTimer={activeTimer} pausedByMeeting={pausedByMeeting} issues={issues} repositoryId={connectionId}
-          revision={revision} writing={interactionPending} systemTimeZone={connection?.systemTimeZone}
+          revision={revision} writing={interactionPending} systemTimeZone={connection?.systemTimeZone} jiraTimeZone={user?.timeZone}
           onSelectIssue={(issue) => { void requestTracking(issue); }}
           onToggleTimer={() => {
             if (interactionPending || !activeTimer.issueKey) return;
@@ -386,16 +425,23 @@ export default function App() {
               setActiveTimer((timer) => ({ ...timer, seconds: 0, isRunning: false, startedAt: undefined }));
             }
           }}
-          onLogWork={async (key, duration, body, started) => {
+          onStageWorklog={(entry) => {
             setPausedByMeeting(null);
-            setActiveTimer((timer) => ({ ...timer, isRunning: false }));
-            await mutate('worklog', { key, duration, body, started });
             setActiveTimer((timer) => ({ ...timer, seconds: 0, isRunning: false, startedAt: undefined }));
+            stageWorklog(entry);
           }} />}
         {activeTab === 'meetings' && <MeetingsTab issues={issues} initialMeetings={meetings} onMeetingsChange={setMeetings} writing={interactionPending}
           systemTimeZone={connection?.systemTimeZone}
           onStartTracking={(issue, event) => { void requestTracking(issue, event); }}
           onOpenIssue={(key) => { void openIssue(key); }}
+          onStageWorklog={stageWorklog} />}
+        {activeTab === 'staged' && <StagedWorklogsTab stagedWorklogs={stagedWorklogs}
+          onUpdateStaged={updateStagedWorklog}
+          onRemoveStaged={removeStagedWorklog}
+          onClearStaged={() => setStagedWorklogs([])}
+          writing={interactionPending}
+          systemTimeZone={connection?.systemTimeZone}
+          jiraTimeZone={user?.timeZone}
           onLogWork={async (key, duration, body, started) => {
             await mutate('worklog', { key, duration, body, started });
           }} />}

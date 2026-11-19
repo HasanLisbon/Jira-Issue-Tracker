@@ -30,6 +30,12 @@
 </ul>
     ]]></description>
     <change-notes><![CDATA[
+<h3>0.1.5</h3>
+<ul>
+  <li>Added <strong>Staged</strong> worklogs tab: time from both <strong>Tracker</strong> and <strong>Meetings</strong> is now staged for review and inline editing (duration, start time, and description) with a single <strong>Log All to Jira</strong> action.</li>
+  <li>Formatted all time spent displays in hours and minutes (e.g. <code>5h 23m</code> instead of raw minutes like <code>323m</code>).</li>
+  <li>Fixed worldwide Jira worklog timezone alignment by matching the authenticated Jira user's profile timezone (<code>/rest/api/2/myself</code>) so logged times appear accurately in Jira Web UI across all timezones.</li>
+</ul>
 <h3>0.1.4</h3>
 <ul>
   <li>Fixed worklog, meeting, and comment timestamps to always use the OS/JVM system timezone (preventing 1-hour UTC/DST offsets when JCEF defaults to UTC).</li>

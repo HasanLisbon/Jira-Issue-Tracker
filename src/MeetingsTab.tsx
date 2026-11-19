@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Clock, Link2, Unlink, Play, Send, RotateCw, SlidersHorizontal, Video, ExternalLink } from 'lucide-react';
-import type { JiraIssue, TeamsMeeting, MeetingTicketMapping, TeamsMeetingsResponse } from './types.ts';
-import { cestInput, jiraRequest, resolveMeetingTicket, worklogStarted } from './jira.ts';
+import { Calendar, Clock, Link2, Unlink, Play, ClipboardPlus, RotateCw, SlidersHorizontal, Video, ExternalLink } from 'lucide-react';
+import type { JiraIssue, TeamsMeeting, MeetingTicketMapping, TeamsMeetingsResponse, StagedWorklog } from './types.ts';
+import { cestInput, formatDuration, jiraRequest, resolveMeetingTicket } from './jira.ts';
 import { messages } from './messages.ts';
 
 interface MeetingsTabProps {
@@ -9,7 +9,7 @@ interface MeetingsTabProps {
   initialMeetings?: TeamsMeeting[];
   onMeetingsChange?: (meetings: TeamsMeeting[]) => void;
   onStartTracking: (issue: { key: string; title: string }, event?: React.MouseEvent) => void;
-  onLogWork: (key: string, duration: string, comment: string, started: string) => Promise<void>;
+  onStageWorklog: (entry: Omit<StagedWorklog, 'id'>) => void;
   onOpenIssue: (key: string) => void;
   writing: boolean;
   systemTimeZone?: string;
@@ -139,20 +139,18 @@ export const MeetingsTab: React.FC<MeetingsTabProps> = (props) => {
     }
   }
 
-  async function logMeetingWork(meeting: TeamsMeeting, issueKey: string) {
-    setBusyMeetingId(meeting.id);
+  function stageMeetingWork(meeting: TeamsMeeting, issueKey: string, issueTitle: string) {
     setError('');
-    setNotice('');
-    try {
-      const startInput = cestInput(new Date(meeting.start), props.systemTimeZone);
-      const startedIso = worklogStarted(startInput, props.systemTimeZone);
-      await props.onLogWork(issueKey, meeting.durationFormatted, `Teams meeting: ${meeting.title}`, startedIso);
-      setNotice(messages.saved);
-    } catch (failure) {
-      setError(describeError(failure));
-    } finally {
-      setBusyMeetingId('');
-    }
+    const startInput = cestInput(new Date(meeting.start), props.systemTimeZone);
+    props.onStageWorklog({
+      issueKey,
+      issueTitle: issueTitle || meeting.title,
+      minutes: Math.max(1, Math.round(meeting.durationMinutes)),
+      started: startInput,
+      comment: `Teams meeting: ${meeting.title}`,
+      source: 'meeting',
+    });
+    setNotice(messages['staged.added']);
   }
 
   const formatMeetingTime = (startIso: string, endIso: string) => {
@@ -313,7 +311,7 @@ export const MeetingsTab: React.FC<MeetingsTabProps> = (props) => {
                   <span>{formatMeetingTime(meeting.start, meeting.end)}</span>
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#181A20] border border-[#2E3240] text-[#34C759]">
                     <Clock className="w-2.5 h-2.5" />
-                    {meeting.durationFormatted}
+                    {formatDuration(meeting.durationMinutes)}
                   </span>
                 </div>
               </div>
@@ -379,11 +377,11 @@ export const MeetingsTab: React.FC<MeetingsTabProps> = (props) => {
                     <button
                       type="button"
                       disabled={cardBusy}
-                      onClick={() => { void logMeetingWork(meeting, resolved.issueKey); }}
+                      onClick={() => stageMeetingWork(meeting, resolved.issueKey, resolved.issueTitle)}
                       className="flex items-center gap-1 px-2 py-1 rounded bg-[#232630] border border-[#34C759]/50 text-[#34C759] hover:bg-[#34C759]/10 text-[10.5px] font-medium disabled:opacity-40"
                     >
-                      <Send className="w-2.5 h-2.5" />
-                      {messages['meetings.action.log.work']} ({meeting.durationFormatted})
+                      <ClipboardPlus className="w-2.5 h-2.5" />
+                      {messages['meetings.action.log.work']} ({formatDuration(meeting.durationMinutes)})
                     </button>
                   </div>
                 )}

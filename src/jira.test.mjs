@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { tsImport } from 'tsx/esm/api';
 
-const { mapIssue, cestInput, formatLocalDateTime, worklogStarted, jiraRequest, formatCommitMessage, resolveMeetingTicket, evaluateMeetingTimerCollision } = await tsImport('./jira.ts', import.meta.url);
+const { mapIssue, cestInput, formatLocalDateTime, parseDurationMinutes, formatDuration, formatTimeSpent, worklogStarted, jiraRequest, formatCommitMessage, resolveMeetingTicket, evaluateMeetingTimerCollision } = await tsImport('./jira.ts', import.meta.url);
 const { prepareTracking, branchNames, repositoryKey, belongsToRepository } = await tsImport('./branches.ts', import.meta.url);
 
 test('normalizes web, https and ssh repository URLs to the same key', () => {
@@ -167,6 +167,29 @@ test('formats and submits worklogs using the system timezone at the entered date
     assert.equal(worklogStarted('2026-07-24T09:30', 'Europe/Stockholm'), '2026-07-24T09:30:00+02:00');
     assert.equal(formatLocalDateTime('2026-11-19T13:30:00Z', 'Europe/Stockholm'), '2026-11-19 14:30:00');
     assert.throws(() => worklogStarted('2026-03-29T02:30', 'Europe/Stockholm'));
+
+    // When Jira profile timezone differs from system timezone (e.g. Sweden user on a UTC Jira profile),
+    // submitting with jiraTimeZone preserves the user's entered wall-clock time in Jira Web UI worldwide
+    assert.equal(worklogStarted('2026-11-19T07:00', 'UTC'), '2026-11-19T07:00:00+00:00');
+    assert.equal(worklogStarted('2026-11-19T09:30', 'America/New_York'), '2026-11-19T09:30:00-05:00');
+    assert.equal(worklogStarted('2026-11-19T18:15', 'Asia/Tokyo'), '2026-11-19T18:15:00+09:00');
+
+    // Duration parsing and human-readable Xh Ym formatting
+    assert.equal(parseDurationMinutes('45'), 45);
+    assert.equal(parseDurationMinutes('45m'), 45);
+    assert.equal(parseDurationMinutes('1h 30m'), 90);
+    assert.equal(parseDurationMinutes('2h'), 120);
+    assert.equal(parseDurationMinutes('323m'), 323);
+    assert.equal(parseDurationMinutes('0m'), null);
+    assert.equal(parseDurationMinutes('-5m'), null);
+    assert.equal(formatDuration(0), '0m');
+    assert.equal(formatDuration(45), '45m');
+    assert.equal(formatDuration(90), '1h 30m');
+    assert.equal(formatDuration(120), '2h');
+    assert.equal(formatDuration(323), '5h 23m');
+    assert.equal(formatTimeSpent('323m'), '5h 23m');
+    assert.equal(formatTimeSpent('2h 30m'), '2h 30m');
+    assert.equal(formatTimeSpent('45m'), '45m');
   } finally {
     if (originalTimezone === undefined) delete process.env.TZ;
     else process.env.TZ = originalTimezone;

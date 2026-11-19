@@ -18,7 +18,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { JiraIssue } from './types.ts';
-import { formatCommitMessage, formatLocalDateTime, jiraRequest, initials } from './jira.ts';
+import { formatCommitMessage, formatLocalDateTime, formatTimeSpent, jiraRequest, initials } from './jira.ts';
 import type { JiraComment, JiraTransition } from './jira.ts';
 import { messages } from './messages.ts';
 
@@ -295,7 +295,7 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({
               Time Tracking
             </span>
             <span className="font-mono text-[11px] text-[#34C759]">
-              Logged: {issue.timeSpent || '0m'} / {issue.estimate}
+              Logged: {formatTimeSpent(issue.timeSpent) || '0m'} / {issue.estimate}
             </span>
           </div>
         </div>

@@ -322,18 +322,26 @@ test('connection profiles and task branch confirmation preserve query, timer own
         setValue.call(duration, '1m');
         duration.dispatchEvent(new Event('input', { bubbles: true }));
       })()`);
-      fixture.failWorklog = true;
       const before = fixture.requests.filter(request => request.operation === 'worklog').length;
-      await click('Submit Worklog');
+      await click('Stage Worklog');
+      assert.equal(fixture.requests.filter(request => request.operation === 'worklog').length, before, 'Staging must not post directly to Jira');
+      await evaluate(`(() => {
+        const tab = [...document.querySelectorAll('button')].find(b => b.textContent.trim().startsWith('Staged'));
+        tab?.click();
+      })()`);
+      await wait('document.body.innerText.includes("Log All to Jira (1)")');
+      fixture.failWorklog = true;
+      await click('Log All to Jira (1)');
       await wait('document.querySelector("[role=alert]")?.textContent.includes("Test worklog rejected")');
       assert.equal(await evaluate('document.querySelector("input[type=datetime-local]").value'), input);
       assert.equal(fixture.requests.filter(request => request.operation === 'worklog').length, before + 1);
       fixture.failWorklog = false;
-      await click('Submit Worklog');
+      await click('Log All to Jira (1)');
       await wait('document.querySelector("[role=status]")?.textContent === "Saved to Jira." && !document.querySelector("[role=alert]")');
-      await wait(`document.body.innerText.includes(${JSON.stringify(input.replace('T', ' ') + ':00')})`);
       assert.equal(fixture.requests.filter(request => request.operation === 'worklog').length, before + 2);
       assert.equal(fixture.worklogs.at(-1).started, `${input}:00${offset}`);
+      await click('Tracker');
+      await wait(`document.body.innerText.includes(${JSON.stringify(input.replace('T', ' ') + ':00')})`);
       assert.equal(await evaluate('document.querySelector("input[type=datetime-local]").closest("form").querySelector("input:not([type])").value'), '');
     }
   } finally {

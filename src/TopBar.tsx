@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, RotateCw, SlidersHorizontal, ListTodo, Timer, FileText, Calendar } from 'lucide-react';
+import { Zap, RotateCw, SlidersHorizontal, ListTodo, Timer, FileText, Calendar, ClipboardList } from 'lucide-react';
 import type { ActiveTab } from './types.ts';
 import type { JiraConnection } from './jira.ts';
 import { messages } from './messages.ts';
@@ -14,6 +14,7 @@ interface TopBarProps {
   connectionId: string;
   onSelectConnection: (id: string) => void;
   hasActiveTimer: boolean;
+  stagedCount: number;
   user: string;
   disabled: boolean;
 }
@@ -39,11 +40,17 @@ export const TopBar: React.FC<TopBarProps> = (props) => (
         <span className="max-w-24 truncate text-[11px] text-[#C5CAD4]" title={props.user}>{props.user}</span>
       </div>
     </div>
-    <div className="flex items-center px-2 pt-1 gap-1">
-      {([['issues', ListTodo], ['tracker', Timer], ['details', FileText], ['meetings', Calendar]] as const).map(([tab, Icon]) => (
+    <div className="flex items-center px-2 pt-1 gap-1 overflow-x-auto">
+      {([['issues', ListTodo], ['tracker', Timer], ['details', FileText], ['meetings', Calendar], ['staged', ClipboardList]] as const).map(([tab, Icon]) => (
         <button key={tab} type="button" disabled={props.disabled} onClick={() => props.onTabChange(tab)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-t text-[11.5px] font-medium border-t border-x ${props.activeTab === tab ? 'bg-[#1E2028] text-[#E1E4EA] border-[#2B2E3C]' : 'text-[#7D8395] border-transparent hover:bg-[#232630]'}`}>
-          <Icon className={`w-3.5 h-3.5 ${tab === 'tracker' && props.hasActiveTimer ? 'text-[#34C759]' : 'text-[#5384F7]'}`} />{messages[tab]}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-t text-[11.5px] font-medium border-t border-x shrink-0 ${props.activeTab === tab ? 'bg-[#1E2028] text-[#E1E4EA] border-[#2B2E3C]' : 'text-[#7D8395] border-transparent hover:bg-[#232630]'}`}>
+          <Icon className={`w-3.5 h-3.5 ${tab === 'tracker' && props.hasActiveTimer ? 'text-[#34C759]' : 'text-[#5384F7]'}`} />
+          <span>{messages[tab]}</span>
+          {tab === 'staged' && props.stagedCount > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full bg-[#3B68FF] text-white font-mono text-[9.5px] leading-tight">
+              {props.stagedCount}
+            </span>
+          )}
         </button>
       ))}
     </div>

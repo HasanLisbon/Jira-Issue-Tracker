@@ -55,7 +55,17 @@ export interface JiraIssue {
 
 export type FilterKey = 'assigned' | 'reported' | 'recent' | 'sprint';
 
-export type ActiveTab = 'issues' | 'tracker' | 'details' | 'meetings';
+export type ActiveTab = 'issues' | 'tracker' | 'details' | 'meetings' | 'staged';
+
+export interface StagedWorklog {
+  id: string;
+  issueKey: string;
+  issueTitle: string;
+  minutes: number;
+  started: string;
+  comment: string;
+  source: 'tracker' | 'meeting';
+}
 
 export interface TeamsMeeting {
   id: string;

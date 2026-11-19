@@ -463,8 +463,14 @@ try {
     const startBtn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Track Time'));
     startBtn?.click();
   })()`);
-  await wait('document.body.innerText.includes("Submit Worklog") && document.body.innerText.includes("Implemented PKCE verifier")');
+  await wait('document.body.innerText.includes("Stage Worklog") && document.body.innerText.includes("Implemented PKCE verifier")');
   await evaluate(`(() => {
+    const durationInput = document.querySelector('input[type="datetime-local"]')?.closest('form')?.querySelector('input:not([type])');
+    if (durationInput) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      setter.call(durationInput, '1h 30m');
+      durationInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     const commentInput = document.querySelector('textarea');
     if (commentInput) {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
@@ -475,6 +481,13 @@ try {
   await delay(1200);
   await capture('04-tracker-tab.png');
 
+  // Stage the Tracker worklog
+  await evaluate(`(() => {
+    const stageBtn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Stage Worklog'));
+    stageBtn?.click();
+  })()`);
+  await delay(200);
+
   // 5. Meetings Tab (open Meetings tab showing synced Teams meetings & linked Jira tickets)
   await evaluate(`(() => {
     const tab = [...document.querySelectorAll('button')].find(b => b.textContent.trim().startsWith('Meetings'));
@@ -482,6 +495,22 @@ try {
   })()`);
   await wait('document.body.innerText.includes("Daily Platform Engineering Standup") && document.body.innerText.includes("OAuth2 PKCE Security Architecture Review")');
   await capture('05-meetings-tab.png');
+
+  // Stage two Teams meetings and capture the new Staged tab
+  await evaluate(`(() => {
+    const stageButtons = [...document.querySelectorAll('button')].filter(b => b.textContent.includes('Stage Meeting Time'));
+    stageButtons[0]?.click();
+    stageButtons[1]?.click();
+  })()`);
+  await delay(200);
+
+  // 6. Staged Worklogs Tab
+  await evaluate(`(() => {
+    const tab = [...document.querySelectorAll('button')].find(b => b.textContent.trim().startsWith('Staged'));
+    tab?.click();
+  })()`);
+  await wait('document.body.innerText.includes("Log All to Jira (3)") && document.body.innerText.includes("2h 30m")');
+  await capture('06-staged-tab.png');
 } finally {
   socket?.close();
   if (browser.exitCode === null) {

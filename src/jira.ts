@@ -13,6 +13,7 @@ export interface JiraUser {
   name?: string;
   key?: string;
   displayName?: string;
+  timeZone?: string;
 }
 
 export interface JiraComment {
@@ -159,6 +160,37 @@ function zonedDateTimeParts(epochMs: number, timeZone: string) {
 
 function partsToUtcMs(parts: { year: number; month: number; day: number; hour: number; minute: number }): number {
   return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+}
+
+export function parseDurationMinutes(raw: string): number | null {
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) return null;
+  if (/^\d+$/.test(trimmed)) {
+    const mins = Number(trimmed);
+    return Number.isSafeInteger(mins) && mins > 0 ? mins : null;
+  }
+  const match = /^(?:(\d+)h)?\s*(?:(\d+)m)?$/.exec(trimmed);
+  if (!match || (!match[1] && !match[2])) return null;
+  const hours = match[1] ? Number(match[1]) : 0;
+  const mins = match[2] ? Number(match[2]) : 0;
+  const total = hours * 60 + mins;
+  return Number.isSafeInteger(total) && total > 0 ? total : null;
+}
+
+export function formatDuration(totalMinutes: number): string {
+  const safe = Math.max(0, Math.round(totalMinutes));
+  if (safe === 0) return '0m';
+  const hours = Math.floor(safe / 60);
+  const mins = safe % 60;
+  if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${mins}m`;
+}
+
+export function formatTimeSpent(timeSpent?: string): string {
+  if (!timeSpent) return '';
+  const parsed = parseDurationMinutes(timeSpent);
+  return parsed !== null ? formatDuration(parsed) : timeSpent;
 }
 
 export function formatLocalDateTime(value: string | Date, timeZone?: string): string {
