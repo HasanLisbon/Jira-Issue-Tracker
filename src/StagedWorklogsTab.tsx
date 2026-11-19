@@ -219,12 +219,14 @@ export const StagedWorklogsTab: React.FC<StagedWorklogsTabProps> = ({
             <label className="text-[10px] font-mono text-[#7D8395]">
               {messages.started}
               <input
-                type="datetime-local"
+                type="text"
                 required
-                value={entry.started}
+                data-started-input="true"
+                placeholder="YYYY-MM-DD HH:mm"
+                value={entry.started.replace('T', ' ')}
                 disabled={disabled}
                 onChange={(event) => onUpdateStaged(entry.id, { started: event.target.value })}
-                className="mt-1 w-full bg-[#181A20] text-[#E1E4EA] px-2 py-1 rounded border border-[#2E3240]"
+                className="mt-1 w-full bg-[#181A20] text-[#E1E4EA] font-mono px-2.5 py-1 rounded border border-[#2E3240]"
               />
             </label>
           </div>

@@ -465,7 +465,7 @@ try {
   })()`);
   await wait('document.body.innerText.includes("Stage Worklog") && document.body.innerText.includes("Implemented PKCE verifier")');
   await evaluate(`(() => {
-    const durationInput = document.querySelector('input[type="datetime-local"]')?.closest('form')?.querySelector('input:not([type])');
+    const durationInput = document.querySelector('[data-started-input]')?.closest('form')?.querySelector('input:not([data-started-input])');
     if (durationInput) {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
       setter.call(durationInput, '1h 30m');

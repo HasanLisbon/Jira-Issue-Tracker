@@ -243,9 +243,14 @@ export function cestInput(date: Date, timeZone?: string): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
+export function normalizeStartedInput(input: string): string {
+  return input.trim().replace(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})$/, '$1T$2');
+}
+
 export function worklogStarted(input: string, timeZone?: string): string {
+  const normalized = normalizeStartedInput(input);
   if (timeZone) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(input);
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(normalized);
     if (!match) throw new Error('started.invalid');
     const target = {
       year: Number(match[1]),
@@ -274,7 +279,7 @@ export function worklogStarted(input: string, timeZone?: string): string {
       ) {
         throw new Error('started.invalid');
       }
-      return `${input}:00${timeZone.trim()}`;
+      return `${normalized}:00${timeZone.trim()}`;
     }
 
     try {
@@ -289,18 +294,18 @@ export function worklogStarted(input: string, timeZone?: string): string {
       const offset = Math.round((utcGuess - candidate) / 60000);
       const hours = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
       const minutes = String(Math.abs(offset) % 60).padStart(2, '0');
-      return `${input}:00${offset < 0 ? '-' : '+'}${hours}:${minutes}`;
+      return `${normalized}:00${offset < 0 ? '-' : '+'}${hours}:${minutes}`;
     } catch (failure) {
       if (failure instanceof Error && failure.message === 'started.invalid') throw failure;
       // Fall back to runtime local timezone if timeZone is unrecognized
     }
   }
-  const date = new Date(input);
-  if (!Number.isFinite(date.getTime()) || cestInput(date) !== input) throw new Error('started.invalid');
+  const date = new Date(normalized);
+  if (!Number.isFinite(date.getTime()) || cestInput(date) !== normalized) throw new Error('started.invalid');
   const offset = -date.getTimezoneOffset();
   const hours = String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0');
   const minutes = String(Math.abs(offset) % 60).padStart(2, '0');
-  return `${input}:00${offset < 0 ? '-' : '+'}${hours}:${minutes}`;
+  return `${normalized}:00${offset < 0 ? '-' : '+'}${hours}:${minutes}`;
 }
 
 export interface ResolvedMeetingTicket {

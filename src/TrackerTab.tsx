@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Play, Pause, RotateCcw, ClipboardPlus, History } from 'lucide-react';
 import type { ActiveTimer, JiraIssue, MeetingTimerPause, StagedWorklog } from './types.ts';
-import { cestInput, formatDuration, formatLocalDateTime, formatTimeSpent, parseDurationMinutes, worklogStarted, jiraRequest } from './jira.ts';
+import { cestInput, formatDuration, formatLocalDateTime, formatTimeSpent, normalizeStartedInput, parseDurationMinutes, worklogStarted, jiraRequest } from './jira.ts';
 import type { JiraWorklog } from './jira.ts';
 import { messages } from './messages.ts';
 
@@ -25,13 +25,13 @@ export const TrackerTab: React.FC<TrackerTabProps> = (props) => {
   const worklogTimeZone = jiraTimeZone || systemTimeZone;
   const [workComment, setWorkComment] = useState('');
   const [customTime, setCustomTime] = useState('');
-  const [started, setStarted] = useState(() => cestInput(activeTimer.startedAt || new Date(), systemTimeZone));
+  const [started, setStarted] = useState(() => cestInput(activeTimer.startedAt || new Date(), systemTimeZone).replace('T', ' '));
   const [worklogs, setWorklogs] = useState<JiraWorklog[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setStarted(cestInput(activeTimer.startedAt || new Date(), systemTimeZone));
+    setStarted(cestInput(activeTimer.startedAt || new Date(), systemTimeZone).replace('T', ' '));
   }, [activeTimer.issueKey, activeTimer.startedAt, systemTimeZone]);
 
   useEffect(() => {
@@ -56,8 +56,9 @@ export const TrackerTab: React.FC<TrackerTabProps> = (props) => {
       setError(messages['duration.invalid']);
       return;
     }
+    const normalizedStarted = normalizeStartedInput(started);
     try {
-      worklogStarted(started, worklogTimeZone);
+      worklogStarted(normalizedStarted, worklogTimeZone);
     } catch (failure) {
       setError(failure instanceof Error ? messages[failure.message] || failure.message : messages['started.invalid']);
       return;
@@ -67,7 +68,7 @@ export const TrackerTab: React.FC<TrackerTabProps> = (props) => {
       issueKey: activeTimer.issueKey,
       issueTitle: activeTimer.issueTitle,
       minutes: parsedMinutes,
-      started,
+      started: normalizedStarted,
       comment: workComment,
       source: 'tracker',
     });
@@ -118,8 +119,8 @@ export const TrackerTab: React.FC<TrackerTabProps> = (props) => {
                 placeholder={formatDuration(Math.floor(activeTimer.seconds / 60))} className="mt-1 w-full bg-[#181A20] text-[#E1E4EA] px-2.5 py-1.5 rounded border border-[#2E3240]" />
             </label>
             <label className="text-[10px] font-mono text-[#7D8395]">{messages.started}
-              <input type="datetime-local" required value={started} onChange={(event) => setStarted(event.target.value)} disabled={disabled}
-                className="mt-1 w-full bg-[#181A20] text-[#E1E4EA] px-2 py-1.5 rounded border border-[#2E3240]" />
+              <input type="text" required data-started-input="true" placeholder="YYYY-MM-DD HH:mm" value={started} onChange={(event) => setStarted(event.target.value)} disabled={disabled}
+                className="mt-1 w-full bg-[#181A20] text-[#E1E4EA] font-mono px-2.5 py-1.5 rounded border border-[#2E3240]" />
             </label>
           </div>
           <label className="block text-[10px] font-mono text-[#7D8395]">{messages['work.description']}

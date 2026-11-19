@@ -181,6 +181,8 @@ test('formats and submits worklogs using the system timezone at the entered date
     assert.equal(extractServerOffset('2026-11-19T09:50:58.123-0500'), '-05:00');
     assert.equal(extractServerOffset('2026-11-19T09:50:58Z'), '+00:00');
     assert.equal(worklogStarted('2026-11-19T08:00', '+00:00'), '2026-11-19T08:00:00+00:00');
+    assert.equal(worklogStarted('2026-11-19 08:00', '+00:00'), '2026-11-19T08:00:00+00:00');
+    assert.equal(worklogStarted('2026-11-19 08:00', 'Europe/Stockholm'), '2026-11-19T08:00:00+01:00');
     assert.equal(formatLocalDateTime('2026-11-19T08:00:00.000+0000', '+00:00'), '2026-11-19 08:00:00');
     assert.equal(formatLocalDateTime('2026-11-19T08:00:00.000+0100', '+01:00'), '2026-11-19 08:00:00');
     assert.throws(() => worklogStarted('2026-02-30T08:00', '+00:00'));

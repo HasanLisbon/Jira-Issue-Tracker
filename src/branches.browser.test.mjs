@@ -314,10 +314,10 @@ test('connection profiles and task branch confirmation preserve query, timer own
     assert.ok(await evaluate('document.body.innerText.includes("Started (system local time)")'));
     for (const [input, offset] of [['2026-07-24T09:30', '+02:00'], ['2026-10-29T09:30', '+01:00']]) {
       await evaluate(`(() => {
-        const started = document.querySelector('input[type="datetime-local"]');
-        const duration = started.closest('form').querySelector('input:not([type])');
+        const started = document.querySelector('[data-started-input]');
+        const duration = started.closest('form').querySelector('input:not([data-started-input])');
         const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-        setValue.call(started, ${JSON.stringify(input)});
+        setValue.call(started, ${JSON.stringify(input.replace('T', ' '))});
         started.dispatchEvent(new Event('input', { bubbles: true }));
         setValue.call(duration, '1m');
         duration.dispatchEvent(new Event('input', { bubbles: true }));
@@ -333,7 +333,7 @@ test('connection profiles and task branch confirmation preserve query, timer own
       fixture.failWorklog = true;
       await click('Log All to Jira (1)');
       await wait('document.querySelector("[role=alert]")?.textContent.includes("Test worklog rejected")');
-      assert.equal(await evaluate('document.querySelector("input[type=datetime-local]").value'), input);
+      assert.equal(await evaluate('document.querySelector("[data-started-input]").value'), input.replace('T', ' '));
       assert.equal(fixture.requests.filter(request => request.operation === 'worklog').length, before + 1);
       fixture.failWorklog = false;
       await click('Log All to Jira (1)');
@@ -342,7 +342,7 @@ test('connection profiles and task branch confirmation preserve query, timer own
       assert.equal(fixture.worklogs.at(-1).started, `${input}:00${offset}`);
       await click('Tracker');
       await wait(`document.body.innerText.includes(${JSON.stringify(input.replace('T', ' ') + ':00')})`);
-      assert.equal(await evaluate('document.querySelector("input[type=datetime-local]").closest("form").querySelector("input:not([type])").value'), '');
+      assert.equal(await evaluate('document.querySelector("[data-started-input]").closest("form").querySelector("input:not([data-started-input])").value'), '');
     }
   } finally {
     socket?.close();
