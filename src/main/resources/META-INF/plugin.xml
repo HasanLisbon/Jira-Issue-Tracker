@@ -30,6 +30,10 @@
 </ul>
     ]]></description>
     <change-notes><![CDATA[
+<h3>0.1.7</h3>
+<ul>
+  <li>Made the <strong>Started</strong> date/time field freely editable (<code>YYYY-MM-DD HH:mm</code>) in both the <strong>Tracker</strong> and <strong>Staged</strong> tabs, resolving JCEF <code>datetime-local</code> editing issues inside IntelliJ IDEA.</li>
+</ul>
 <h3>0.1.6</h3>
 <ul>
   <li>Fixed worklog timezone alignment on Jira Servers running in UTC or a different JVM offset by automatically detecting the server's offset via <code>/rest/api/2/serverInfo</code>, so logged start times match in both Jira Web UI and the plugin worldwide.</li>
