@@ -16,20 +16,24 @@
     <strong>Git Branch Automation:</strong> Automatically detects existing local and remote-tracking branches linked to an issue (or its parent ticket) and offers one-click creation and checkout of standardized <code>feature/</code> or <code>bugfix/</code> branches when starting a timer.
   </li>
   <li>
-    <strong>Time Tracker &amp; Worklog Management:</strong> Built-in live stopwatch and manual duration logging with timezone-aware start times, work descriptions, worklog history, and customizable commit message templates (<code>{issueKey}: {summary}</code>).
+    <strong>Time Tracker &amp; Staged Worklogs:</strong> Built-in live stopwatch with human-readable <code>Xh Ym</code> durations, customizable commit message templates (<code>{issueKey}: {summary}</code>), and a dedicated <strong>Staged</strong> tab where time from both <strong>Tracker</strong> and <strong>Meetings</strong> is queued for review and inline editing before submitting all entries to Jira in one click.
   </li>
   <li>
-    <strong>Microsoft Teams &amp; Outlook Meetings Sync:</strong> Sync upcoming calendar events via a published Outlook/Teams ICS feed URL (no Azure admin approval needed) or Microsoft Graph API token, link single or recurring meetings to Jira tickets, and log meeting durations to Jira in one click.
+    <strong>Microsoft Teams &amp; Outlook Meetings Sync:</strong> Sync upcoming calendar events via a published Outlook/Teams ICS feed URL (no Azure admin approval needed) or Microsoft Graph API token, link single or recurring meetings to Jira tickets, and stage meeting durations in one click.
   </li>
   <li>
     <strong>Smart Meeting Collision Pause &amp; Resume:</strong> Automatically pauses any active task timer when a scheduled meeting starts and resumes tracking your task as soon as the meeting ends.
   </li>
   <li>
-    <strong>Multiple Connections &amp; Secure Credentials:</strong> Configure multiple named Jira Server/Data Center profiles with Basic Auth or Personal Access Tokens (Bearer) stored securely in IntelliJ Password Safe.
+    <strong>Worldwide Timezone Alignment &amp; Secure Credentials:</strong> Automatically aligns logged worklog timestamps with your Jira Server's timezone (<code>/rest/api/2/serverInfo</code>) across all timezones, and stores multiple Jira Server/Data Center profiles securely in IntelliJ Password Safe.
   </li>
 </ul>
     ]]></description>
     <change-notes><![CDATA[
+<h3>0.1.6</h3>
+<ul>
+  <li>Fixed worklog timezone alignment on Jira Servers running in UTC or a different JVM offset by automatically detecting the server's offset via <code>/rest/api/2/serverInfo</code>, so logged start times match in both Jira Web UI and the plugin worldwide.</li>
+</ul>
 <h3>0.1.5</h3>
 <ul>
   <li>Added <strong>Staged</strong> worklogs tab: time from both <strong>Tracker</strong> and <strong>Meetings</strong> is now staged for review and inline editing (duration, start time, and description) with a single <strong>Log All to Jira</strong> action.</li>
