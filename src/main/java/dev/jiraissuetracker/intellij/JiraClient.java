@@ -60,6 +60,9 @@ final class JiraClient {
         if (operation.equals("myself")) {
             return read("myself");
         }
+        if (operation.equals("serverInfo")) {
+            return read("serverInfo");
+        }
         String key = required(request, "key");
         if (!KEY.matcher(key).matches()) {
             throw invalid("request.invalid");

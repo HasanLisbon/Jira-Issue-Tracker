@@ -193,9 +193,35 @@ export function formatTimeSpent(timeSpent?: string): string {
   return parsed !== null ? formatDuration(parsed) : timeSpent;
 }
 
+export function extractServerOffset(serverTime?: string): string | undefined {
+  if (!serverTime) return undefined;
+  const trimmed = serverTime.trim();
+  if (trimmed.endsWith('Z')) return '+00:00';
+  const match = /([+-])(\d{2}):?(\d{2})$/.exec(trimmed);
+  if (!match) return undefined;
+  const hours = Number(match[2]);
+  const minutes = Number(match[3]);
+  if (hours > 14 || minutes > 59) return undefined;
+  return `${match[1]}${match[2]}:${match[3]}`;
+}
+
+function parseFixedOffsetMinutes(offset: string): number | null {
+  const match = /^([+-])(\d{2}):(\d{2})$/.exec(offset.trim());
+  if (!match) return null;
+  const sign = match[1] === '-' ? -1 : 1;
+  return sign * (Number(match[2]) * 60 + Number(match[3]));
+}
+
 export function formatLocalDateTime(value: string | Date, timeZone?: string): string {
   const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(date.getTime())) return '';
+  if (timeZone) {
+    const fixedMinutes = parseFixedOffsetMinutes(timeZone);
+    if (fixedMinutes !== null) {
+      const shifted = new Date(date.getTime() + fixedMinutes * 60000);
+      return shifted.toISOString().slice(0, 19).replace('T', ' ');
+    }
+  }
   try {
     return date.toLocaleString('sv-SE', timeZone ? { timeZone } : undefined);
   } catch {
@@ -235,6 +261,21 @@ export function worklogStarted(input: string, timeZone?: string): string {
       && parts.day === target.day
       && parts.hour === target.hour
       && parts.minute === target.minute;
+
+    const fixedMinutes = parseFixedOffsetMinutes(timeZone);
+    if (fixedMinutes !== null) {
+      const check = new Date(utcGuess);
+      if (
+        check.getUTCFullYear() !== target.year
+        || check.getUTCMonth() + 1 !== target.month
+        || check.getUTCDate() !== target.day
+        || check.getUTCHours() !== target.hour
+        || check.getUTCMinutes() !== target.minute
+      ) {
+        throw new Error('started.invalid');
+      }
+      return `${input}:00${timeZone.trim()}`;
+    }
 
     try {
       const firstParts = zonedDateTimeParts(utcGuess, timeZone);

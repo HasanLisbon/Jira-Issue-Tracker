@@ -11,7 +11,7 @@ import { TrackerTab } from './TrackerTab.tsx';
 import { MeetingsTab } from './MeetingsTab.tsx';
 import { StagedWorklogsTab } from './StagedWorklogsTab.tsx';
 import { SettingsModal } from './SettingsModal.tsx';
-import { jiraRequest, mapIssue, formatDuration, evaluateMeetingTimerCollision, findCollidingMeetings } from './jira.ts';
+import { jiraRequest, mapIssue, formatDuration, extractServerOffset, evaluateMeetingTimerCollision, findCollidingMeetings } from './jira.ts';
 import type { JiraConnection, JiraUser, RawIssue } from './jira.ts';
 import type { ActiveTab, ActiveTimer, JiraIssue, Subtask, FilterKey, TeamsMeeting, TeamsMeetingsResponse, MeetingTimerPause, StagedWorklog } from './types.ts';
 import { messages } from './messages.ts';
@@ -26,6 +26,7 @@ export default function App() {
   const [filter, setFilter] = useState<FilterKey | 'all'>('all');
   const [issues, setIssues] = useState<JiraIssue[]>([]);
   const [user, setUser] = useState<JiraUser>();
+  const [serverOffset, setServerOffset] = useState<string>();
   const [selectedIssueId, setSelectedIssueId] = useState('');
   const [activeTab, setActiveTab] = useState<ActiveTab>('issues');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -98,9 +99,11 @@ export default function App() {
     setError('');
     try {
       const currentUser = await jiraRequest<JiraUser>('myself', { repositoryId: id });
+      const serverInfo = await jiraRequest<{ serverTime?: string }>('serverInfo', { repositoryId: id }).catch(() => undefined);
       const loaded = await jiraRequest<RawIssue[]>('search', { repositoryId: id, query: jql, filter: scope });
       if (generation.current !== requestGeneration) return;
       setUser(currentUser);
+      setServerOffset(extractServerOffset(serverInfo?.serverTime));
       setIssues(loaded.map((issue) => mapIssue(issue, currentUser)));
       setSelectedIssueId((previous) => loaded.some((issue) => issue.id === previous) ? previous : loaded[0]?.id || '');
       setRevision((previous) => previous + 1);
@@ -238,6 +241,7 @@ export default function App() {
     setIssues([]);
     setFilter('all');
     setUser(undefined);
+    setServerOffset(undefined);
     setSelectedIssueId('');
     setPausedByMeeting(null);
     setActiveTimer({ issueKey: '', issueTitle: '', seconds: 0, isRunning: false });
@@ -408,7 +412,7 @@ export default function App() {
         systemTimeZone={connection?.systemTimeZone} />
         : <div className="p-4 text-[#7D8395]">{messages['no.issue']}</div>)}
         {activeTab === 'tracker' && <TrackerTab activeTimer={activeTimer} pausedByMeeting={pausedByMeeting} issues={issues} repositoryId={connectionId}
-          revision={revision} writing={interactionPending} systemTimeZone={connection?.systemTimeZone} jiraTimeZone={user?.timeZone}
+          revision={revision} writing={interactionPending} systemTimeZone={connection?.systemTimeZone} jiraTimeZone={serverOffset || user?.timeZone}
           onSelectIssue={(issue) => { void requestTracking(issue); }}
           onToggleTimer={() => {
             if (interactionPending || !activeTimer.issueKey) return;
@@ -441,7 +445,7 @@ export default function App() {
           onClearStaged={() => setStagedWorklogs([])}
           writing={interactionPending}
           systemTimeZone={connection?.systemTimeZone}
-          jiraTimeZone={user?.timeZone}
+          jiraTimeZone={serverOffset || user?.timeZone}
           onLogWork={async (key, duration, body, started) => {
             await mutate('worklog', { key, duration, body, started });
           }} />}

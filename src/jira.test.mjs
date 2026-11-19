@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { tsImport } from 'tsx/esm/api';
 
-const { mapIssue, cestInput, formatLocalDateTime, parseDurationMinutes, formatDuration, formatTimeSpent, worklogStarted, jiraRequest, formatCommitMessage, resolveMeetingTicket, evaluateMeetingTimerCollision } = await tsImport('./jira.ts', import.meta.url);
+const { mapIssue, cestInput, formatLocalDateTime, extractServerOffset, parseDurationMinutes, formatDuration, formatTimeSpent, worklogStarted, jiraRequest, formatCommitMessage, resolveMeetingTicket, evaluateMeetingTimerCollision } = await tsImport('./jira.ts', import.meta.url);
 const { prepareTracking, branchNames, repositoryKey, belongsToRepository } = await tsImport('./branches.ts', import.meta.url);
 
 test('normalizes web, https and ssh repository URLs to the same key', () => {
@@ -173,6 +173,17 @@ test('formats and submits worklogs using the system timezone at the entered date
     assert.equal(worklogStarted('2026-11-19T07:00', 'UTC'), '2026-11-19T07:00:00+00:00');
     assert.equal(worklogStarted('2026-11-19T09:30', 'America/New_York'), '2026-11-19T09:30:00-05:00');
     assert.equal(worklogStarted('2026-11-19T18:15', 'Asia/Tokyo'), '2026-11-19T18:15:00+09:00');
+
+    // When Jira server JVM runs in a different offset (e.g. +0000 UTC while user is in Sweden +0100),
+    // serverInfo.serverTime offset ensures Jira Web UI and Issue worklogs both display the entered wall-clock time
+    assert.equal(extractServerOffset('2026-11-19T09:50:58.123+0000'), '+00:00');
+    assert.equal(extractServerOffset('2026-11-19T09:50:58.123+0100'), '+01:00');
+    assert.equal(extractServerOffset('2026-11-19T09:50:58.123-0500'), '-05:00');
+    assert.equal(extractServerOffset('2026-11-19T09:50:58Z'), '+00:00');
+    assert.equal(worklogStarted('2026-11-19T08:00', '+00:00'), '2026-11-19T08:00:00+00:00');
+    assert.equal(formatLocalDateTime('2026-11-19T08:00:00.000+0000', '+00:00'), '2026-11-19 08:00:00');
+    assert.equal(formatLocalDateTime('2026-11-19T08:00:00.000+0100', '+01:00'), '2026-11-19 08:00:00');
+    assert.throws(() => worklogStarted('2026-02-30T08:00', '+00:00'));
 
     // Duration parsing and human-readable Xh Ym formatting
     assert.equal(parseDurationMinutes('45'), 45);
